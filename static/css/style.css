@@ -164,6 +164,14 @@ body {
 .fila-tasca.propia { background: #DBEAFE; border-color: #BFDBFE; }
 .fila-tasca-row1 { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
 .fila-tasca-row2 { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.fila-tasca-carpeta { padding-top: 3px; }
+.btn-obrir-carpeta {
+    height: 20px; border: none; border-radius: 10px;
+    background: #E5E7EB; color: #6B7280; font-size: 0.7rem;
+    padding: 0 10px; cursor: pointer; white-space: nowrap;
+}
+.btn-obrir-carpeta:hover { background: #D1D5DB; }
+.btn-obrir-carpeta:active { transform: scale(0.97); }
 .tasca-nom { font-weight: 700; font-size: 0.87rem; }
 .tasca-avatars { display: flex; gap: 2px; align-items: center; }
 .tasca-estats { display: flex; gap: 3px; align-items: center; }

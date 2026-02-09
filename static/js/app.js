@@ -303,9 +303,25 @@ const App = {
         const docInlineHTML = t.document ? this._renderDocumentInline(t, nomProjecte) : '';
         const obsHTML = this._renderObservacions(t, nomProjecte);
 
+        // Boto "Obrir carpeta: NOM" (identic al desktop — nomes si te document)
+        let carpetaDocHTML = '';
+        if (t.document) {
+            const docPath = t.document.replace(/\\/g, '/');
+            const parts = docPath.split('/');
+            parts.pop(); // Treure el nom del fitxer
+            const nomCarpeta = parts.length > 0 ? parts[parts.length - 1] : nomProjecte;
+            const carpetaPath = parts.join('/') || nomProjecte;
+            carpetaDocHTML = `<div class="fila-tasca-carpeta">
+                <button class="btn-obrir-carpeta" onclick="App.obrirCarpeta('${this._esc(carpetaPath)}')" title="Obrir carpeta a OneDrive">
+                    Obrir carpeta: ${this._esc(nomCarpeta)}
+                </button>
+            </div>`;
+        }
+
         // Layout identic al desktop: 2 files
         // Fila 1: nom tasca + avatars assignacio
         // Fila 2: botons estat (pills) + enviar + document (pill verd) + x eliminar
+        // Fila 3 (opcional): obrir carpeta del document
         return `
             <div class="fila-tasca${classPropi}">
                 <div class="fila-tasca-row1">
@@ -319,6 +335,7 @@ const App = {
                         <button class="btn-eliminar-tasca" onclick="App.confirmarEliminarTasca('${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Eliminar">&times;</button>
                     </div>
                 </div>
+                ${carpetaDocHTML}
                 ${obsHTML}
             </div>`;
     },

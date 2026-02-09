@@ -3,7 +3,7 @@ Blueprint API REST — Endpoints JSON per a crides AJAX des del frontend.
 """
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, Response, jsonify, request, session
 
 import config_web
 from models.tasca import Tasca
@@ -39,10 +39,14 @@ def llistar_projectes():
     projectes = dm.carregar()
     persona = request.args.get("persona", "")
     cerca = request.args.get("cerca", "").lower()
+    arxivats = request.args.get("arxivats", "") == "1"
 
     resultat = []
     for nom, proj in projectes.items():
-        if proj.arxivat:
+        # Filtrar arxivats segons el parametre
+        if not arxivats and proj.arxivat:
+            continue
+        if arxivats and not proj.arxivat:
             continue
 
         if cerca and cerca not in nom.lower():
@@ -70,12 +74,14 @@ def llistar_projectes():
             "tasques_completades": proj.tasques_completades,
             "percentatge": round(proj.percentatge, 1),
             "prioritari": proj.prioritari,
+            "arxivat": proj.arxivat,
             "usuaris_implicats": list(usuaris_implicats),
             "usuaris_pendents": list(usuaris_pendents),
         })
 
-    resultat.sort(key=lambda p: (not p["prioritari"], p["nom_carpeta"]),
-                  reverse=True)
+    # Ordenar: prioritaris primer, despres per nom descendent (mes nous primer)
+    resultat.sort(key=lambda p: p["nom_carpeta"], reverse=True)
+    resultat.sort(key=lambda p: not p["prioritari"])
     return jsonify(resultat)
 
 
@@ -345,6 +351,26 @@ def eliminar_usuari(nom):
     dm.carregar()
     dm.eliminar_usuari(nom)
     return jsonify({"ok": True})
+
+
+# --- FOTOS D'USUARI ---
+
+@api_bp.route("/foto/<path:nom>")
+def obtenir_foto_usuari(nom):
+    """Serveix la foto d'un usuari des d'OneDrive."""
+    token = get_access_token()
+    if not token:
+        return "", 404
+
+    graph = GraphClient(token)
+    # Provar extensions comunes
+    for ext in ["png", "jpg", "jpeg"]:
+        foto = graph.obtenir_foto(f"{nom}.{ext}")
+        if foto:
+            content_type = "image/png" if ext == "png" else "image/jpeg"
+            return Response(foto, mimetype=content_type,
+                            headers={"Cache-Control": "public, max-age=3600"})
+    return "", 404
 
 
 # --- ONEDRIVE: CARPETES I FITXERS ---

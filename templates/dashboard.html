@@ -28,8 +28,13 @@
     <!-- Panel esquerre: llista projectes -->
     <aside id="panel-projectes" class="panel-projectes">
         <div class="panel-header">
-            <span class="panel-title">PROJECTES</span>
-            <button id="btn-afegir-projecte" class="btn btn-small btn-add" title="Afegir projecte">+</button>
+            <span id="panel-title-text" class="panel-title">PROJECTES</span>
+            <div style="display:flex;gap:4px">
+                <button id="btn-arxivats" class="btn btn-small" title="Projectes arxivats">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+                </button>
+                <button id="btn-afegir-projecte" class="btn btn-small btn-add" title="Afegir projecte">+</button>
+            </div>
         </div>
         <div id="projectes-llista" class="projectes-llista"></div>
     </aside>

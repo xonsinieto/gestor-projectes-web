@@ -5,10 +5,12 @@ const App = {
     projecteActual: null,
     filtrePersona: '',
     cercaText: '',
+    mostrarArxivats: false,
     _cercaTimer: null,
     _pollTimer: null,
     usuaris: [],
     _projectesData: [],
+    _fotosCache: {},  // Cache: nom -> url (blob o fallback)
 
     // Colors d'usuari (mateixos que desktop)
     COLORS_USUARIS: ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'],
@@ -28,6 +30,7 @@ const App = {
         document.getElementById('btn-tornar').addEventListener('click', () => this.tornarALlista());
         document.getElementById('btn-notif').addEventListener('click', () => this.toggleNotificacions());
         document.getElementById('cerca').addEventListener('input', (e) => this._onCerca(e.target.value));
+        document.getElementById('btn-arxivats').addEventListener('click', () => this.toggleArxivats());
     },
 
     // --- UTILS COLOR ---
@@ -48,6 +51,51 @@ const App = {
         return nom.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
     },
 
+    // --- FOTOS D'USUARI ---
+
+    async _carregarFoto(nom) {
+        if (this._fotosCache[nom] !== undefined) return this._fotosCache[nom];
+        try {
+            const resp = await fetch(`/api/foto/${encodeURIComponent(nom)}`);
+            if (resp.ok) {
+                const blob = await resp.blob();
+                const url = URL.createObjectURL(blob);
+                this._fotosCache[nom] = url;
+                return url;
+            }
+        } catch (e) { /* ignora */ }
+        this._fotosCache[nom] = null;
+        return null;
+    },
+
+    async _carregarTotesFotos() {
+        if (!this.usuaris.length) return;
+        const promises = this.usuaris.map(u => this._carregarFoto(u));
+        await Promise.all(promises);
+    },
+
+    _renderAvatarHTML(nom, mida, extraClasses) {
+        const fotoUrl = this._fotosCache[nom];
+        const inicials = this._inicialsUsuari(nom);
+        const color = this._colorPerUsuari(nom);
+        const sz = mida || 28;
+        const cls = extraClasses || '';
+        if (fotoUrl) {
+            return `<img src="${fotoUrl}" class="avatar-foto ${cls}" style="width:${sz}px;height:${sz}px;border-radius:50%;object-fit:cover" title="${this._esc(nom)}">`;
+        }
+        return `<span class="projecte-avatar ${cls}" style="background:${color};width:${sz}px;height:${sz}px;font-size:${sz * 0.4}px" title="${this._esc(nom)}">${inicials}</span>`;
+    },
+
+    // --- ARXIVATS ---
+
+    toggleArxivats() {
+        this.mostrarArxivats = !this.mostrarArxivats;
+        const btn = document.getElementById('btn-arxivats');
+        btn.classList.toggle('active', this.mostrarArxivats);
+        document.getElementById('panel-title-text').textContent = this.mostrarArxivats ? 'ARXIVATS' : 'PROJECTES';
+        this.carregarProjectes();
+    },
+
     // --- PROJECTES ---
 
     async carregarProjectes() {
@@ -55,6 +103,7 @@ const App = {
         const params = [];
         if (this.filtrePersona) params.push(`persona=${encodeURIComponent(this.filtrePersona)}`);
         if (this.cercaText) params.push(`cerca=${encodeURIComponent(this.cercaText)}`);
+        if (this.mostrarArxivats) params.push('arxivats=1');
         if (params.length) url += '?' + params.join('&');
 
         const projectes = await API.get(url);
@@ -78,19 +127,17 @@ const App = {
             const colorBarra = this._colorPerPercentatge(pct);
             const colorPct = pct >= 100 ? '#10B981' : '#374151';
 
-            // Avatars dels usuaris implicats
+            // Avatars dels usuaris implicats (amb fotos si disponibles)
             let avatarsHTML = '';
             if (p.usuaris_implicats && p.usuaris_implicats.length) {
                 avatarsHTML = '<div class="projecte-avatars">';
                 for (const u of p.usuaris_implicats) {
-                    const inicials = this._inicialsUsuari(u);
-                    const color = this._colorPerUsuari(u);
                     const esPropi = u === CONFIG.usuariActual;
                     const tePendents = (p.usuaris_pendents || []).includes(u);
-                    let classes = 'projecte-avatar';
+                    let classes = '';
                     if (!esPropi) classes += ' inactiu';
                     if (tePendents) classes += ' te-pendents';
-                    avatarsHTML += `<span class="${classes}" style="background:${color}" title="${this._esc(u)}">${inicials}</span>`;
+                    avatarsHTML += this._renderAvatarHTML(u, 24, classes.trim());
                 }
                 avatarsHTML += '</div>';
             }
@@ -126,6 +173,8 @@ const App = {
         if (!proj) return;
 
         this.usuaris = proj.usuaris || [];
+        // Carregar fotos en background (no bloquejar)
+        this._carregarTotesFotos();
 
         // Header
         document.getElementById('detall-header').classList.remove('hidden');
@@ -218,6 +267,14 @@ const App = {
             const inicials = this._inicialsUsuari(u);
             const color = this.COLORS_USUARIS[i % this.COLORS_USUARIS.length];
             const opacitat = actiu ? '1' : '0.3';
+            const fotoUrl = this._fotosCache[u];
+            if (fotoUrl) {
+                return `<button class="avatar-btn" style="padding:0;background:transparent;opacity:${opacitat}"
+                            onclick="App.assignarTasca('${this._esc(nomProjecte)}','${this._esc(t.nom)}','${actiu ? '' : this._esc(u)}')"
+                            title="${this._esc(u)}">
+                            <img src="${fotoUrl}" style="width:28px;height:28px;border-radius:50%;object-fit:cover">
+                        </button>`;
+            }
             return `<button class="avatar-btn" style="background:${color};opacity:${opacitat}"
                         onclick="App.assignarTasca('${this._esc(nomProjecte)}','${this._esc(t.nom)}','${actiu ? '' : this._esc(u)}')"
                         title="${this._esc(u)}">${inicials}</button>`;
@@ -481,10 +538,19 @@ const App = {
     mostrarDialogRevisor(nomProjecte, nomTasca) {
         const avatars = this.usuaris.map((u, i) => {
             const inicials = this._inicialsUsuari(u);
-            return `<button class="avatar-btn-gran" style="background:${this.COLORS_USUARIS[i % this.COLORS_USUARIS.length]}"
+            const fotoUrl = this._fotosCache[u];
+            const color = this.COLORS_USUARIS[i % this.COLORS_USUARIS.length];
+            let contingut;
+            if (fotoUrl) {
+                contingut = `<img src="${fotoUrl}" style="width:56px;height:56px;border-radius:50%;object-fit:cover">
+                    <span class="avatar-nom">${this._esc(u)}</span>`;
+            } else {
+                contingut = `<span class="avatar-inicials">${inicials}</span>
+                    <span class="avatar-nom">${this._esc(u)}</span>`;
+            }
+            return `<button class="avatar-btn-gran" style="background:${fotoUrl ? 'transparent' : color}"
                         onclick="App._seleccionarRevisor('${this._esc(nomProjecte)}','${this._esc(nomTasca)}','${this._esc(u)}')">
-                        <span class="avatar-inicials">${inicials}</span>
-                        <span class="avatar-nom">${this._esc(u)}</span>
+                        ${contingut}
                     </button>`;
         }).join('');
 
@@ -642,8 +708,16 @@ const App = {
         usuaris.forEach((u, i) => {
             const inicials = this._inicialsUsuari(u);
             const actiu = this.filtrePersona === u ? 'active' : '';
-            html += `<button class="avatar-btn filter-avatar ${actiu}" style="background:${this.COLORS_USUARIS[i % this.COLORS_USUARIS.length]}"
-                        onclick="App.filtrar('${this._esc(u)}')" title="${this._esc(u)}">${inicials}</button>`;
+            const fotoUrl = this._fotosCache[u];
+            if (fotoUrl) {
+                html += `<button class="avatar-btn filter-avatar ${actiu}" style="padding:0;background:transparent"
+                            onclick="App.filtrar('${this._esc(u)}')" title="${this._esc(u)}">
+                            <img src="${fotoUrl}" style="width:28px;height:28px;border-radius:50%;object-fit:cover">
+                        </button>`;
+            } else {
+                html += `<button class="avatar-btn filter-avatar ${actiu}" style="background:${this.COLORS_USUARIS[i % this.COLORS_USUARIS.length]}"
+                            onclick="App.filtrar('${this._esc(u)}')" title="${this._esc(u)}">${inicials}</button>`;
+            }
         });
         container.innerHTML = html;
     },

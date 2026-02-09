@@ -93,6 +93,9 @@ body {
     flex-shrink: 0;
 }
 .projecte-avatar.inactiu { filter: grayscale(100%); opacity: 0.5; }
+.avatar-foto { flex-shrink: 0; display: inline-block; }
+.avatar-foto.inactiu { filter: grayscale(100%); opacity: 0.5; }
+.avatar-foto.te-pendents { box-shadow: 0 0 0 2px #EF4444; }
 .projecte-avatar.te-pendents { box-shadow: 0 0 0 2px #EF4444; }
 
 /* === PANEL DETALL (DRET) === */
@@ -196,6 +199,7 @@ body {
 .btn-primary:active { background: #2563EB; }
 .btn-add { background: #A7F3D0; color: #065F46; border-color: #A7F3D0; font-weight: 700; }
 .btn-add:hover { background: #6EE7B7; }
+.btn.active { background: #3B82F6; color: white; border-color: #3B82F6; }
 .btn-danger { background: #EF4444; color: white; border-color: #EF4444; }
 .btn-danger:active { background: #DC2626; }
 .btn-small { padding: 4px 10px; font-size: 0.8rem; }

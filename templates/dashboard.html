@@ -29,7 +29,7 @@
     <aside id="panel-projectes" class="panel-projectes">
         <div class="panel-header">
             <span class="panel-title">PROJECTES</span>
-            <button id="btn-afegir-projecte" class="btn btn-small btn-primary" title="Afegir projecte">+</button>
+            <button id="btn-afegir-projecte" class="btn btn-small btn-add" title="Afegir projecte">+</button>
         </div>
         <div id="projectes-llista" class="projectes-llista"></div>
     </aside>
@@ -41,7 +41,7 @@
                 <button id="btn-tornar" class="btn-icon btn-tornar" title="Tornar">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
-                <button id="btn-afegir-tasca" class="btn btn-small btn-primary" title="Afegir tasques">+</button>
+                <button id="btn-afegir-tasca" class="btn btn-small btn-add" title="Afegir tasques">+</button>
                 <h2 id="titol-projecte" class="detall-titol"></h2>
                 <span id="progres-projecte" class="detall-progres"></span>
             </div>
@@ -54,6 +54,12 @@
         </div>
     </section>
 </main>
+
+<!-- Barra inferior: resum -->
+<footer class="bottom-bar">
+    <div id="bottom-resum" class="bottom-resum"></div>
+    <span id="bottom-sync" class="bottom-sync"></span>
+</footer>
 
 <!-- Overlay per dialogs -->
 <div id="overlay" class="overlay hidden" onclick="App.tancarDialog()"></div>

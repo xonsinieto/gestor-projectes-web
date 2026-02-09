@@ -8,6 +8,10 @@ const App = {
     _cercaTimer: null,
     _pollTimer: null,
     usuaris: [],
+    _projectesData: [],
+
+    // Colors d'usuari (mateixos que desktop)
+    COLORS_USUARIS: ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'],
 
     // --- INICIALITZACIO ---
 
@@ -26,6 +30,24 @@ const App = {
         document.getElementById('cerca').addEventListener('input', (e) => this._onCerca(e.target.value));
     },
 
+    // --- UTILS COLOR ---
+
+    _colorPerUsuari(nom) {
+        const idx = this.usuaris.indexOf(nom);
+        return this.COLORS_USUARIS[(idx >= 0 ? idx : 0) % this.COLORS_USUARIS.length];
+    },
+
+    _colorPerPercentatge(pct) {
+        if (pct >= 100) return '#10B981';
+        if (pct >= 50) return '#F59E0B';
+        if (pct > 0) return '#3B82F6';
+        return '#6B7280';
+    },
+
+    _inicialsUsuari(nom) {
+        return nom.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+    },
+
     // --- PROJECTES ---
 
     async carregarProjectes() {
@@ -37,7 +59,9 @@ const App = {
 
         const projectes = await API.get(url);
         if (!projectes) return;
+        this._projectesData = projectes;
         this._renderProjectes(projectes);
+        this._renderBarraInferior();
     },
 
     _renderProjectes(projectes) {
@@ -51,19 +75,40 @@ const App = {
             const seleccionat = this.projecteActual === p.nom_carpeta ? 'selected' : '';
             const prioritari = p.prioritari ? '<span class="badge-prioritari">!</span>' : '';
             const pct = p.percentatge;
+            const colorBarra = this._colorPerPercentatge(pct);
+            const colorPct = pct >= 100 ? '#10B981' : '#374151';
+
+            // Avatars dels usuaris implicats
+            let avatarsHTML = '';
+            if (p.usuaris_implicats && p.usuaris_implicats.length) {
+                avatarsHTML = '<div class="projecte-avatars">';
+                for (const u of p.usuaris_implicats) {
+                    const inicials = this._inicialsUsuari(u);
+                    const color = this._colorPerUsuari(u);
+                    const esPropi = u === CONFIG.usuariActual;
+                    const tePendents = (p.usuaris_pendents || []).includes(u);
+                    let classes = 'projecte-avatar';
+                    if (!esPropi) classes += ' inactiu';
+                    if (tePendents) classes += ' te-pendents';
+                    avatarsHTML += `<span class="${classes}" style="background:${color}" title="${this._esc(u)}">${inicials}</span>`;
+                }
+                avatarsHTML += '</div>';
+            }
+
             return `
                 <div class="projecte-item ${seleccionat}" data-nom="${this._esc(p.nom_carpeta)}"
                      onclick="App.seleccionarProjecte('${this._esc(p.nom_carpeta)}')">
                     <div class="projecte-item-top">
                         ${prioritari}
-                        <span class="projecte-codi">${this._esc(p.codi)}</span>
-                        <span class="projecte-desc">${this._esc(p.descripcio)}</span>
+                        <span class="projecte-nom">${this._esc(p.codi)} ${this._esc(p.descripcio)}</span>
+                    </div>
+                    <div class="barra-progres">
+                        <div class="barra-progres-fill" style="width:${pct}%;background:${colorBarra}"></div>
                     </div>
                     <div class="projecte-item-bottom">
-                        <div class="barra-progres">
-                            <div class="barra-progres-fill" style="width:${pct}%;background:${pct >= 100 ? '#10B981' : '#3B82F6'}"></div>
-                        </div>
                         <span class="projecte-stats">${p.tasques_completades}/${p.total_tasques}</span>
+                        <span class="projecte-pct" style="color:${colorPct}">${pct}%</span>
+                        ${avatarsHTML}
                     </div>
                 </div>`;
         }).join('');
@@ -73,7 +118,7 @@ const App = {
         this.projecteActual = nom;
         document.getElementById('panel-detall').classList.add('active');
         await this._carregarDetall(nom);
-        this.carregarProjectes(); // Actualitzar seleccio visual
+        this.carregarProjectes();
     },
 
     async _carregarDetall(nom) {
@@ -110,6 +155,9 @@ const App = {
 
         // Actualitzar filter avatars
         this._renderFilterAvatars(proj.usuaris);
+
+        // Actualitzar barra inferior
+        this._renderBarraInferior();
     },
 
     _renderOverview(tasques) {
@@ -141,14 +189,14 @@ const App = {
 
     _renderFilaTasca(t, nomProjecte) {
         const esPropi = t.assignat === CONFIG.usuariActual;
-        const fonsFila = esPropi ? '#DBEAFE' : '#FFFFFF';
+        const classPropi = esPropi ? ' propia' : '';
         const assignatHTML = this._renderAssignacio(t, nomProjecte);
         const estatsHTML = this._renderBotonsEstat(t, nomProjecte);
         const docHTML = t.document ? this._renderDocument(t, nomProjecte) : '';
         const obsHTML = this._renderObservacions(t, nomProjecte);
 
         return `
-            <div class="fila-tasca" style="background:${fonsFila}">
+            <div class="fila-tasca${classPropi}">
                 <div class="fila-tasca-top">
                     <span class="tasca-nom">${this._esc(t.nom)}</span>
                     <div class="tasca-accions">
@@ -165,11 +213,10 @@ const App = {
     },
 
     _renderAssignacio(t, nomProjecte) {
-        const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
         return this.usuaris.map((u, i) => {
             const actiu = t.assignat === u;
-            const inicials = u.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
-            const color = colors[i % colors.length];
+            const inicials = this._inicialsUsuari(u);
+            const color = this.COLORS_USUARIS[i % this.COLORS_USUARIS.length];
             const opacitat = actiu ? '1' : '0.3';
             return `<button class="avatar-btn" style="background:${color};opacity:${opacitat}"
                         onclick="App.assignarTasca('${this._esc(nomProjecte)}','${this._esc(t.nom)}','${actiu ? '' : this._esc(u)}')"
@@ -178,18 +225,25 @@ const App = {
     },
 
     _renderBotonsEstat(t, nomProjecte) {
-        return CONFIG.estats.filter(e => e !== CONFIG.COMPLETADA).map(estat => {
+        // Boto "Enviar" rapid (visible nomes si Pendent + te assignat)
+        let enviarHTML = '';
+        if (t.estat === CONFIG.PENDENT && t.assignat) {
+            enviarHTML = `<button class="btn-enviar-rapid"
+                onclick="App.canviarEstat('${this._esc(nomProjecte)}','${this._esc(t.nom)}','enviat')">Enviar</button>`;
+        }
+
+        const botons = CONFIG.estats.map(estat => {
             const actiu = t.estat === estat;
             const etiqueta = CONFIG.etiquetes[estat];
             const color = actiu ? CONFIG.colorsActiuText[estat] : '#6B7280';
-            const fons = actiu ? CONFIG.colorsActiuFons[estat] : '#F3F4F6';
-            return `<button class="btn-estat" style="color:${color};background:${fons}"
+            const fons = actiu ? CONFIG.colorsActiuFons[estat] : '#E5E7EB';
+            const classActiu = actiu ? ' actiu' : '';
+            return `<button class="btn-estat${classActiu}" style="color:${color};background:${fons}"
                         onclick="App.canviarEstat('${this._esc(nomProjecte)}','${this._esc(t.nom)}','${estat}')"
                     >${etiqueta}</button>`;
-        }).join('') +
-            `<button class="btn-estat btn-completar" style="color:#065F46;background:#D1FAE5"
-                onclick="App.canviarEstat('${this._esc(nomProjecte)}','${this._esc(t.nom)}','${CONFIG.COMPLETADA}')"
-            >Completada</button>`;
+        }).join('');
+
+        return enviarHTML + botons;
     },
 
     _renderDocument(t, nomProjecte) {
@@ -206,7 +260,7 @@ const App = {
     _renderObservacions(t, nomProjecte) {
         const obs = t.observacions || '';
         return `<div class="tasca-observacions">
-            ${obs ? `<div class="obs-historial">${this._formatObs(obs)}</div>` : ''}
+            ${obs ? `<div class="obs-label">Observacions:</div><div class="obs-historial">${this._formatObs(obs)}</div>` : ''}
             <div class="obs-input-row">
                 <input type="text" class="obs-input" placeholder="Afegir observacio..."
                        id="obs-${this._esc(t.nom)}"
@@ -219,11 +273,37 @@ const App = {
     _formatObs(text) {
         return text.split('\n').filter(l => l.trim()).map(l => {
             if (l.startsWith('@')) {
-                const parts = l.split(':\n');
                 return `<div class="obs-line obs-author">${this._esc(l)}</div>`;
             }
             return `<div class="obs-line">${this._esc(l)}</div>`;
         }).join('');
+    },
+
+    // --- BARRA INFERIOR (RESUM) ---
+
+    _renderBarraInferior() {
+        const container = document.getElementById('bottom-resum');
+        const syncEl = document.getElementById('bottom-sync');
+        if (!container) return;
+
+        if (!this.usuaris.length) {
+            container.innerHTML = '';
+            if (syncEl) syncEl.textContent = '';
+            return;
+        }
+
+        const html = this.usuaris.map(u => {
+            const inicials = this._inicialsUsuari(u);
+            const color = this._colorPerUsuari(u);
+            return `<span class="bottom-usuari"><span class="projecte-avatar" style="background:${color};width:18px;height:18px;font-size:0.5rem;vertical-align:middle;display:inline-flex">${inicials}</span> <strong>${this._esc(u)}</strong></span>`;
+        }).join('');
+
+        container.innerHTML = html;
+
+        if (syncEl) {
+            const ara = new Date();
+            syncEl.textContent = `Sincronitzat: ${ara.toLocaleTimeString('ca-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
+        }
     },
 
     // --- ACCIONS ---
@@ -260,7 +340,6 @@ const App = {
         const text = input.value.trim();
         if (!text) return;
 
-        // Obtenir observacions actuals
         const proj = await API.get(`/api/projectes/${encodeURIComponent(nomProjecte)}`);
         const tasca = proj.tasques.find(t => t.nom === nomTasca);
         const obsActual = tasca ? tasca.observacions : '';
@@ -299,7 +378,6 @@ const App = {
         document.getElementById('overlay').classList.add('hidden');
     },
 
-    // Dialog: Afegir projecte
     async mostrarDialogAfegirProjecte() {
         const carpetes = await API.get('/api/carpetes-onedrive');
         if (!carpetes) return;
@@ -321,7 +399,7 @@ const App = {
         this.mostrarDialog(`
             <div class="dialog-header"><h3>Afegir projecte</h3></div>
             <div class="dialog-body dialog-scroll">${llista}</div>
-            <div class="dialog-footer"><button class="btn" onclick="App.tancarDialog()">Cancel·lar</button></div>
+            <div class="dialog-footer"><button class="btn" onclick="App.tancarDialog()">Cancel&middot;lar</button></div>
         `);
     },
 
@@ -332,7 +410,6 @@ const App = {
         this.seleccionarProjecte(nom);
     },
 
-    // Dialog: Afegir tasques
     async mostrarDialogAfegirTasques() {
         if (!this.projecteActual) return;
         const plantilles = await API.get('/api/plantilles');
@@ -340,18 +417,15 @@ const App = {
 
         let html = '<div class="dialog-header"><h3>Afegir tasques</h3></div><div class="dialog-body dialog-scroll">';
 
-        // Assignar a
-        const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
         html += '<div class="assignar-row"><span>Assignar a:</span>';
         html += this.usuaris.map((u, i) => {
-            const inicials = u.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+            const inicials = this._inicialsUsuari(u);
             return `<button class="avatar-btn avatar-selectable" data-usuari="${this._esc(u)}"
-                        style="background:${colors[i % colors.length]}"
+                        style="background:${this.COLORS_USUARIS[i % this.COLORS_USUARIS.length]}"
                         onclick="App._toggleAssignar(this)">${inicials}</button>`;
         }).join('');
         html += '<span id="assignar-nom" class="assignar-nom">Sense assignar</span></div>';
 
-        // Categories amb checkboxes
         for (const [cat, docs] of Object.entries(plantilles)) {
             html += `<div class="cat-header">${this._esc(cat)}</div>`;
             docs.forEach(doc => {
@@ -360,13 +434,12 @@ const App = {
             });
         }
 
-        // Tasca personalitzada
         html += `<div class="cat-header">Personalitzada</div>
                  <input type="text" id="tasca-custom" class="input-full" placeholder="Nom de la tasca...">`;
 
         html += '</div>';
         html += `<div class="dialog-footer">
-            <button class="btn" onclick="App.tancarDialog()">Cancel·lar</button>
+            <button class="btn" onclick="App.tancarDialog()">Cancel&middot;lar</button>
             <button class="btn btn-primary" onclick="App._confirmarAfegirTasques()">Afegir</button>
         </div>`;
 
@@ -405,12 +478,10 @@ const App = {
         this.carregarProjectes();
     },
 
-    // Dialog: Seleccionar revisor (flux "Per revisar")
     mostrarDialogRevisor(nomProjecte, nomTasca) {
-        const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
         const avatars = this.usuaris.map((u, i) => {
-            const inicials = u.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
-            return `<button class="avatar-btn-gran" style="background:${colors[i % colors.length]}"
+            const inicials = this._inicialsUsuari(u);
+            return `<button class="avatar-btn-gran" style="background:${this.COLORS_USUARIS[i % this.COLORS_USUARIS.length]}"
                         onclick="App._seleccionarRevisor('${this._esc(nomProjecte)}','${this._esc(nomTasca)}','${this._esc(u)}')">
                         <span class="avatar-inicials">${inicials}</span>
                         <span class="avatar-nom">${this._esc(u)}</span>
@@ -420,17 +491,15 @@ const App = {
         this.mostrarDialog(`
             <div class="dialog-header"><h3>Qui ha de revisar?</h3></div>
             <div class="dialog-body"><div class="revisor-grid">${avatars}</div></div>
-            <div class="dialog-footer"><button class="btn" onclick="App.tancarDialog()">Cancel·lar</button></div>
+            <div class="dialog-footer"><button class="btn" onclick="App.tancarDialog()">Cancel&middot;lar</button></div>
         `);
     },
 
     async _seleccionarRevisor(nomProjecte, nomTasca, revisor) {
         this.tancarDialog();
-        // Obrir navegador de fitxers per vincular document
         this.mostrarDialogDocument(nomProjecte, nomTasca, 'per_revisar', revisor);
     },
 
-    // Dialog: Navegador de fitxers OneDrive
     _currentDocCallback: null,
 
     mostrarDialogDocument(nomProjecte, nomTasca, accio, revisor = '') {
@@ -483,7 +552,6 @@ const App = {
         if (!cb) return;
         this.tancarDialog();
 
-        // La ruta completa relativa a CARPETA_PROJECTES es: nomProjecte/rutaRelativa
         const docPath = `${cb.nomProjecte}/${rutaRelativa}`;
         const data = { document: docPath };
 
@@ -525,13 +593,12 @@ const App = {
         this.carregarProjectes();
     },
 
-    // Dialog: Confirmar eliminacio
     confirmarEliminarTasca(nomProjecte, nomTasca) {
         this.mostrarDialog(`
             <div class="dialog-header"><h3>Eliminar tasca</h3></div>
             <div class="dialog-body"><p>Segur que vols eliminar "${this._esc(nomTasca)}"?</p></div>
             <div class="dialog-footer">
-                <button class="btn" onclick="App.tancarDialog()">Cancel·lar</button>
+                <button class="btn" onclick="App.tancarDialog()">Cancel&middot;lar</button>
                 <button class="btn btn-danger" onclick="App._eliminarTasca('${this._esc(nomProjecte)}','${this._esc(nomTasca)}')">Eliminar</button>
             </div>
         `);
@@ -549,7 +616,7 @@ const App = {
             <div class="dialog-header"><h3>Eliminar projecte</h3></div>
             <div class="dialog-body"><p>Segur que vols eliminar "${this._esc(nom)}"?</p></div>
             <div class="dialog-footer">
-                <button class="btn" onclick="App.tancarDialog()">Cancel·lar</button>
+                <button class="btn" onclick="App.tancarDialog()">Cancel&middot;lar</button>
                 <button class="btn btn-danger" onclick="App._eliminarProjecte('${this._esc(nom)}')">Eliminar</button>
             </div>
         `);
@@ -570,13 +637,12 @@ const App = {
 
     _renderFilterAvatars(usuaris) {
         const container = document.getElementById('filter-avatars');
-        const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
 
         let html = `<button class="filter-btn ${!this.filtrePersona ? 'active' : ''}" onclick="App.filtrar('')">Tots</button>`;
         usuaris.forEach((u, i) => {
-            const inicials = u.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+            const inicials = this._inicialsUsuari(u);
             const actiu = this.filtrePersona === u ? 'active' : '';
-            html += `<button class="avatar-btn filter-avatar ${actiu}" style="background:${colors[i % colors.length]}"
+            html += `<button class="avatar-btn filter-avatar ${actiu}" style="background:${this.COLORS_USUARIS[i % this.COLORS_USUARIS.length]}"
                         onclick="App.filtrar('${this._esc(u)}')" title="${this._esc(u)}">${inicials}</button>`;
         });
         container.innerHTML = html;

@@ -53,11 +53,14 @@ def llistar_projectes():
             if not te_tasques:
                 continue
 
-        # Calcular quins usuaris tenen tasques pendents
+        # Calcular quins usuaris tenen tasques i quins tenen pendents
+        usuaris_implicats = set()
         usuaris_pendents = set()
         for t in proj.tasques:
-            if t.assignat and t.estat != config_web.ESTAT_COMPLETADA:
-                usuaris_pendents.add(t.assignat)
+            if t.assignat:
+                usuaris_implicats.add(t.assignat)
+                if t.estat != config_web.ESTAT_COMPLETADA:
+                    usuaris_pendents.add(t.assignat)
 
         resultat.append({
             "nom_carpeta": nom,
@@ -67,6 +70,7 @@ def llistar_projectes():
             "tasques_completades": proj.tasques_completades,
             "percentatge": round(proj.percentatge, 1),
             "prioritari": proj.prioritari,
+            "usuaris_implicats": list(usuaris_implicats),
             "usuaris_pendents": list(usuaris_pendents),
         })
 

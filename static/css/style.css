@@ -72,17 +72,18 @@ body {
 .projecte-item-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .badge-prioritari, .badge-prioritari-off {
     display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center;
-    border-radius: 50%; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
-    border: none; cursor: pointer; padding: 0;
+    border-radius: 50%; font-size: 0.85rem; flex-shrink: 0;
+    border: none; cursor: pointer; padding: 0; line-height: 1;
 }
 .badge-prioritari {
     background: #F59E0B; color: white;
     animation: pulse-prioritat 2.1s ease-in-out infinite;
 }
 .badge-prioritari-off {
-    background: #E5E7EB; color: #9CA3AF; opacity: 0.5;
+    background: transparent; color: #D1D5DB; opacity: 0.7;
+    font-size: 0.9rem;
 }
-.badge-prioritari-off:hover { opacity: 0.8; }
+.badge-prioritari-off:hover { opacity: 1; color: #F59E0B; }
 @keyframes pulse-prioritat {
     0%, 100% { opacity: 1; }
     16% { opacity: 0.82; }
@@ -97,6 +98,12 @@ body {
 .barra-progres-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
 .projecte-stats { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; }
 .projecte-pct { font-size: 0.75rem; white-space: nowrap; margin-left: 2px; }
+.btn-carpeta {
+    background: none; border: none; cursor: pointer; font-size: 0.85rem;
+    padding: 0 2px; opacity: 0.5; transition: opacity 0.15s; flex-shrink: 0;
+}
+.btn-carpeta:hover { opacity: 1; }
+.btn-carpeta:active { transform: scale(0.9); }
 .projecte-avatars { display: flex; gap: 2px; align-items: center; margin-left: auto; flex-shrink: 0; }
 .projecte-avatar {
     width: 24px; height: 24px; border-radius: 50%; border: none;

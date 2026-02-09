@@ -3,10 +3,14 @@ Client per a Microsoft Graph API.
 Encapsula totes les operacions amb OneDrive.
 """
 import json
+import logging
+from urllib.parse import quote
 
 import requests
 
 import config_web
+
+logger = logging.getLogger(__name__)
 
 
 class GraphClient:
@@ -84,37 +88,38 @@ class GraphClient:
         })
         return resp.json().get("value", [])
 
-    # --- Links compartits ---
+    # --- URLs de fitxers i carpetes ---
+
+    def _encode_path(self, path: str) -> str:
+        """Codifica cada segment del path per la Graph API (espais, accents, etc.)."""
+        return "/".join(quote(segment, safe="") for segment in path.split("/"))
+
+    def obtenir_url_item(self, path: str) -> str:
+        """Obte la webUrl d'un fitxer o carpeta a OneDrive.
+        Retorna la URL o cadena buida si falla.
+        """
+        encoded = self._encode_path(path)
+        url = f"{self.GRAPH_URL}/me/drive/root:/{encoded}"
+        logger.info(f"Graph API GET: {url}")
+        try:
+            resp = requests.get(
+                url, headers=self._headers, timeout=15,
+            )
+            logger.info(f"Graph API response: {resp.status_code}")
+            if resp.ok:
+                data = resp.json()
+                web_url = data.get("webUrl", "")
+                logger.info(f"webUrl obtingut: {web_url}")
+                return web_url
+            else:
+                logger.warning(f"Graph API error: {resp.status_code} - {resp.text[:200]}")
+        except requests.RequestException as e:
+            logger.error(f"Graph API exception: {e}")
+        return ""
 
     def obtenir_link_compartit(self, path: str) -> str:
-        """Obte la URL de visualitzacio d'un fitxer a OneDrive.
-        Usa webUrl de les metadades (fiable per comptes personals i business).
-        Si falla, intenta createLink com a fallback.
-        """
-        # Metode 1: webUrl de metadades (sempre funciona)
-        try:
-            url = f"{self.GRAPH_URL}/me/drive/root:/{path}"
-            resp = self._get(url, params={"select": "webUrl"})
-            web_url = resp.json().get("webUrl", "")
-            if web_url:
-                return web_url
-        except requests.HTTPError:
-            pass
-
-        # Metode 2: createLink sense scope (comptes personals no suporten scope)
-        try:
-            url = f"{self.GRAPH_URL}/me/drive/root:/{path}:/createLink"
-            resp = requests.post(
-                url,
-                headers={**self._headers, "Content-Type": "application/json"},
-                json={"type": "view"},
-                timeout=15,
-            )
-            if resp.ok:
-                return resp.json().get("link", {}).get("webUrl", "")
-        except requests.RequestException:
-            pass
-        return ""
+        """Obte la URL de visualitzacio d'un fitxer a OneDrive."""
+        return self.obtenir_url_item(path)
 
     # --- Fotos d'usuari ---
 

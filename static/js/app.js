@@ -145,8 +145,8 @@ const App = {
         container.innerHTML = projectes.map(p => {
             const seleccionat = this.projecteActual === p.nom_carpeta ? 'selected' : '';
             const prioritari = p.prioritari
-                ? `<button class="badge-prioritari" onclick="event.stopPropagation();App.togglePrioritat('${this._esc(p.nom_carpeta)}',false)" title="Treure prioritat">!</button>`
-                : `<button class="badge-prioritari-off" onclick="event.stopPropagation();App.togglePrioritat('${this._esc(p.nom_carpeta)}',true)" title="Marcar prioritari">!</button>`;
+                ? `<button class="badge-prioritari" onclick="event.stopPropagation();App.togglePrioritat('${this._esc(p.nom_carpeta)}',false)" title="Treure prioritat">&#9888;</button>`
+                : `<button class="badge-prioritari-off" onclick="event.stopPropagation();App.togglePrioritat('${this._esc(p.nom_carpeta)}',true)" title="Marcar prioritari">&#9888;</button>`;
             const pct = p.percentatge;
             const colorBarra = this._colorPerPercentatge(pct);
             const colorPct = pct >= 100 ? '#10B981' : '#374151';
@@ -166,6 +166,9 @@ const App = {
                 avatarsHTML += '</div>';
             }
 
+            // Icona carpeta per obrir a OneDrive
+            const carpetaBtn = `<button class="btn-carpeta" onclick="event.stopPropagation();App.obrirCarpeta('${this._esc(p.nom_carpeta)}')" title="Obrir carpeta a OneDrive">&#128193;</button>`;
+
             return `
                 <div class="projecte-item ${seleccionat}" data-nom="${this._esc(p.nom_carpeta)}"
                      onclick="App.seleccionarProjecte('${this._esc(p.nom_carpeta)}')">
@@ -179,6 +182,7 @@ const App = {
                     <div class="projecte-item-bottom">
                         <span class="projecte-stats">${p.tasques_completades}/${p.total_tasques}</span>
                         <span class="projecte-pct" style="color:${colorPct}">${pct}%</span>
+                        ${carpetaBtn}
                         ${avatarsHTML}
                     </div>
                 </div>`;
@@ -375,15 +379,32 @@ const App = {
             // Normalitzar backslashes i codificar cada segment (NO les barres!)
             const ruta = rutaDocument.replace(/\\/g, '/');
             const encodedPath = ruta.split('/').map(s => encodeURIComponent(s)).join('/');
-            const resp = await API.get(`/api/obrir-document/${encodedPath}`);
-            if (resp && resp.url) {
-                window.open(resp.url, '_blank');
+            const resp = await fetch(`/api/obrir-document/${encodedPath}`);
+            const data = await resp.json();
+            if (data.url) {
+                window.open(data.url, '_blank');
             } else {
-                alert('No s\'ha pogut obtenir el link del document.');
+                alert(data.error || 'No s\'ha pogut obtenir el link del document.');
             }
         } catch (e) {
             console.error('Error obrint document:', e);
-            alert('Error obrint el document. Comprova que existeix a OneDrive.');
+            alert('Error de connexio obrint el document.');
+        }
+    },
+
+    async obrirCarpeta(nomProjecte) {
+        try {
+            const encodedPath = nomProjecte.split('/').map(s => encodeURIComponent(s)).join('/');
+            const resp = await fetch(`/api/obrir-carpeta/${encodedPath}`);
+            const data = await resp.json();
+            if (data.url) {
+                window.open(data.url, '_blank');
+            } else {
+                alert(data.error || 'No s\'ha pogut obrir la carpeta.');
+            }
+        } catch (e) {
+            console.error('Error obrint carpeta:', e);
+            alert('Error de connexio obrint la carpeta.');
         }
     },
 

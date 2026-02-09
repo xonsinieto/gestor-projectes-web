@@ -403,7 +403,7 @@ def obtenir_foto_usuari(nom):
 
 @api_bp.route("/obrir-document/<path:ruta>")
 def obrir_document(ruta):
-    """Crea un link de visualitzacio d'OneDrive per obrir un document al navegador."""
+    """Obte la URL de visualitzacio d'un fitxer d'OneDrive."""
     import logging
     logger = logging.getLogger(__name__)
 
@@ -416,15 +416,38 @@ def obrir_document(ruta):
 
     graph = GraphClient(token)
     full_path = f"{config_web.ONEDRIVE_BASE_PATH}/{ruta}"
-    logger.info(f"Obrint document: {full_path}")
+    logger.info(f"Obrint document: ruta={ruta}, full_path={full_path}")
 
-    link = graph.obtenir_link_compartit(full_path)
+    # Intentar obtenir URL del fitxer
+    link = graph.obtenir_url_item(full_path)
     if link:
-        logger.info(f"Link obtingut: {link}")
         return jsonify({"url": link})
 
-    logger.warning(f"No s'ha pogut obtenir link per: {full_path}")
+    # Fallback: intentar obrir la carpeta pare
+    parts = ruta.rsplit("/", 1)
+    if len(parts) > 1:
+        folder_path = f"{config_web.ONEDRIVE_BASE_PATH}/{parts[0]}"
+        logger.info(f"Fallback: intentant carpeta pare: {folder_path}")
+        folder_link = graph.obtenir_url_item(folder_path)
+        if folder_link:
+            return jsonify({"url": folder_link, "es_carpeta": True})
+
     return jsonify({"error": f"No s'ha trobat: {ruta}"}), 404
+
+
+@api_bp.route("/obrir-carpeta/<path:nom_projecte>")
+def obrir_carpeta(nom_projecte):
+    """Obte la URL de la carpeta d'un projecte a OneDrive."""
+    token = get_access_token()
+    if not token:
+        return jsonify({"error": "No autenticat"}), 401
+
+    graph = GraphClient(token)
+    folder_path = f"{config_web.ONEDRIVE_BASE_PATH}/{nom_projecte}"
+    link = graph.obtenir_url_item(folder_path)
+    if link:
+        return jsonify({"url": link})
+    return jsonify({"error": "Carpeta no trobada"}), 404
 
 
 # --- ONEDRIVE: CARPETES I FITXERS ---

@@ -1,0 +1,394 @@
+"""
+Blueprint API REST — Endpoints JSON per a crides AJAX des del frontend.
+"""
+from datetime import datetime
+
+from flask import Blueprint, jsonify, request, session
+
+import config_web
+from models.tasca import Tasca
+from routes.auth import get_access_token
+from services.graph_client import GraphClient
+from services.data_manager_web import DataManagerWeb
+
+api_bp = Blueprint("api", __name__)
+
+
+def _get_dm():
+    """Obte un DataManagerWeb autenticat. Retorna (dm, error_response)."""
+    token = get_access_token()
+    if not token:
+        return None, (jsonify({"error": "No autenticat"}), 401)
+    graph = GraphClient(token)
+    return DataManagerWeb(graph), None
+
+
+def _get_usuari():
+    """Retorna el nom de l'usuari actual de la sessio."""
+    return session.get("usuari_actual", "")
+
+
+# --- PROJECTES ---
+
+@api_bp.route("/projectes")
+def llistar_projectes():
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    projectes = dm.carregar()
+    persona = request.args.get("persona", "")
+    cerca = request.args.get("cerca", "").lower()
+
+    resultat = []
+    for nom, proj in projectes.items():
+        if proj.arxivat:
+            continue
+
+        if cerca and cerca not in nom.lower():
+            continue
+
+        if persona:
+            te_tasques = any(t.assignat == persona for t in proj.tasques)
+            if not te_tasques:
+                continue
+
+        # Calcular quins usuaris tenen tasques pendents
+        usuaris_pendents = set()
+        for t in proj.tasques:
+            if t.assignat and t.estat != config_web.ESTAT_COMPLETADA:
+                usuaris_pendents.add(t.assignat)
+
+        resultat.append({
+            "nom_carpeta": nom,
+            "codi": proj.codi,
+            "descripcio": proj.descripcio,
+            "total_tasques": proj.total_tasques,
+            "tasques_completades": proj.tasques_completades,
+            "percentatge": round(proj.percentatge, 1),
+            "prioritari": proj.prioritari,
+            "usuaris_pendents": list(usuaris_pendents),
+        })
+
+    resultat.sort(key=lambda p: (not p["prioritari"], p["nom_carpeta"]),
+                  reverse=True)
+    return jsonify(resultat)
+
+
+@api_bp.route("/projectes/<path:nom>")
+def detall_projecte(nom):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    projectes = dm.carregar()
+    proj = projectes.get(nom)
+    if not proj:
+        return jsonify({"error": "Projecte no trobat"}), 404
+
+    tasques = []
+    for t in proj.tasques:
+        tasques.append({
+            "nom": t.nom,
+            "estat": t.estat,
+            "assignat": t.assignat,
+            "observacions": t.observacions,
+            "document": t.document,
+            "data_modificacio": t.data_modificacio,
+        })
+
+    return jsonify({
+        "nom_carpeta": nom,
+        "codi": proj.codi,
+        "descripcio": proj.descripcio,
+        "total_tasques": proj.total_tasques,
+        "tasques_completades": proj.tasques_completades,
+        "percentatge": round(proj.percentatge, 1),
+        "prioritari": proj.prioritari,
+        "arxivat": proj.arxivat,
+        "tasques": tasques,
+        "usuaris": dm.usuaris,
+    })
+
+
+@api_bp.route("/projectes", methods=["POST"])
+def afegir_projecte():
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    data = request.get_json()
+    nom_carpeta = data.get("nom_carpeta", "").strip()
+    if not nom_carpeta:
+        return jsonify({"error": "Falta nom_carpeta"}), 400
+
+    projectes = dm.carregar()
+    if nom_carpeta in projectes:
+        return jsonify({"error": "Projecte ja existeix"}), 409
+
+    from models.projecte import Projecte
+    projectes[nom_carpeta] = Projecte(nom_carpeta=nom_carpeta)
+    dm.desar(projectes)
+    return jsonify({"ok": True}), 201
+
+
+@api_bp.route("/projectes/<path:nom>", methods=["DELETE"])
+def eliminar_projecte(nom):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    projectes = dm.carregar()
+    if nom not in projectes:
+        return jsonify({"error": "Projecte no trobat"}), 404
+
+    del projectes[nom]
+    dm.desar(projectes)
+    return jsonify({"ok": True})
+
+
+@api_bp.route("/projectes/<path:nom>", methods=["PATCH"])
+def actualitzar_projecte(nom):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    projectes = dm.carregar()
+    proj = projectes.get(nom)
+    if not proj:
+        return jsonify({"error": "Projecte no trobat"}), 404
+
+    data = request.get_json()
+    if "arxivat" in data:
+        proj.arxivat = bool(data["arxivat"])
+    if "prioritari" in data:
+        proj.prioritari = bool(data["prioritari"])
+
+    dm.desar(projectes)
+    return jsonify({"ok": True})
+
+
+# --- TASQUES ---
+
+@api_bp.route("/projectes/<path:nom>/tasques", methods=["POST"])
+def afegir_tasques(nom):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    projectes = dm.carregar()
+    proj = projectes.get(nom)
+    if not proj:
+        return jsonify({"error": "Projecte no trobat"}), 404
+
+    data = request.get_json()
+    noms_tasca = data.get("noms", [])
+    assignat = data.get("assignat", "")
+
+    noms_existents = {t.nom for t in proj.tasques}
+    for nom_tasca in noms_tasca:
+        if nom_tasca not in noms_existents:
+            proj.tasques.append(Tasca(nom=nom_tasca, assignat=assignat))
+
+    dm.desar(projectes)
+    return jsonify({"ok": True}), 201
+
+
+@api_bp.route("/projectes/<path:nom>/tasques/<path:nom_tasca>", methods=["DELETE"])
+def eliminar_tasca(nom, nom_tasca):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    projectes = dm.carregar()
+    proj = projectes.get(nom)
+    if not proj:
+        return jsonify({"error": "Projecte no trobat"}), 404
+
+    proj.tasques = [t for t in proj.tasques if t.nom != nom_tasca]
+    dm.desar(projectes)
+    return jsonify({"ok": True})
+
+
+@api_bp.route("/projectes/<path:nom>/tasques/<path:nom_tasca>", methods=["PATCH"])
+def actualitzar_tasca(nom, nom_tasca):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    projectes = dm.carregar()
+    proj = projectes.get(nom)
+    if not proj:
+        return jsonify({"error": "Projecte no trobat"}), 404
+
+    tasca = next((t for t in proj.tasques if t.nom == nom_tasca), None)
+    if not tasca:
+        return jsonify({"error": "Tasca no trobada"}), 404
+
+    data = request.get_json()
+    usuari = _get_usuari()
+
+    if "estat" in data:
+        nou_estat = data["estat"]
+        antic_estat = tasca.estat
+        tasca.actualitzar_estat(nou_estat)
+
+        # Enviar notificacio si cal
+        if nou_estat == config_web.ESTAT_ENVIAT and tasca.assignat:
+            dm.enviar_notificacio(
+                de=usuari, per_a=tasca.assignat, projecte=nom,
+                tasca=nom_tasca, accio="enviat",
+            )
+        elif nou_estat == config_web.ESTAT_PER_REVISAR:
+            revisor = data.get("revisor", "")
+            if revisor:
+                tasca.assignar_a(revisor)
+                dm.enviar_notificacio(
+                    de=usuari, per_a=revisor, projecte=nom,
+                    tasca=nom_tasca, accio="per_revisar",
+                )
+        elif nou_estat == config_web.ESTAT_COMPLETADA:
+            for u in dm.usuaris:
+                if u != usuari:
+                    dm.enviar_notificacio(
+                        de=usuari, per_a=u, projecte=nom,
+                        tasca=nom_tasca, accio="completada",
+                    )
+
+    if "assignat" in data:
+        tasca.assignar_a(data["assignat"])
+
+    if "observacions" in data:
+        tasca.observacions = data["observacions"]
+        tasca.data_modificacio = datetime.now().isoformat(timespec="seconds")
+
+    if "document" in data:
+        tasca.document = data["document"]
+        tasca.data_modificacio = datetime.now().isoformat(timespec="seconds")
+
+    dm.desar(projectes)
+    return jsonify({"ok": True})
+
+
+# --- NOTIFICACIONS ---
+
+@api_bp.route("/notificacions")
+def obtenir_notificacions():
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    usuari = _get_usuari()
+    dm.carregar()
+    notifs = dm.obtenir_notificacions(usuari)
+    return jsonify([n.to_dict() for n in notifs])
+
+
+@api_bp.route("/notificacions/<notif_id>/llegida", methods=["POST"])
+def marcar_notif_llegida(notif_id):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    dm.marcar_llegida(notif_id)
+    return jsonify({"ok": True})
+
+
+@api_bp.route("/notificacions/totes-llegides", methods=["POST"])
+def marcar_totes_notifs_llegides():
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    dm.marcar_totes_llegides(_get_usuari())
+    return jsonify({"ok": True})
+
+
+# --- USUARIS ---
+
+@api_bp.route("/usuaris")
+def llistar_usuaris():
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    dm.carregar()
+    return jsonify(dm.usuaris)
+
+
+@api_bp.route("/usuaris", methods=["POST"])
+def afegir_usuari():
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    data = request.get_json()
+    nom = data.get("nom", "").strip()
+    if not nom:
+        return jsonify({"error": "Falta nom"}), 400
+
+    dm.carregar()
+    dm.registrar_usuari(nom)
+    return jsonify({"ok": True}), 201
+
+
+@api_bp.route("/usuaris/<path:nom>", methods=["DELETE"])
+def eliminar_usuari(nom):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    dm.carregar()
+    dm.eliminar_usuari(nom)
+    return jsonify({"ok": True})
+
+
+# --- ONEDRIVE: CARPETES I FITXERS ---
+
+@api_bp.route("/carpetes-onedrive")
+def llistar_carpetes_onedrive():
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    dm.carregar()
+    existents = set(dm._projectes.keys())
+    carpetes = dm.llistar_carpetes_projecte()
+    return jsonify([
+        {"nom": c, "ja_afegit": c in existents}
+        for c in carpetes
+    ])
+
+
+@api_bp.route("/fitxers/<path:nom_projecte>")
+def llistar_fitxers(nom_projecte):
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    subcarpeta = request.args.get("subcarpeta", "")
+    fitxers = dm.llistar_fitxers_projecte(nom_projecte, subcarpeta)
+    return jsonify(fitxers)
+
+
+# --- PLANTILLES ---
+
+@api_bp.route("/plantilles")
+def obtenir_plantilles():
+    return jsonify(config_web.DOCUMENTS)
+
+
+# --- SYNC ---
+
+@api_bp.route("/ha-canviat")
+def ha_canviat():
+    dm, err = _get_dm()
+    if err:
+        return err
+
+    etag_anterior = session.get("ultima_etag", "")
+    nova_etag = dm._graph.obtenir_etag(config_web.ONEDRIVE_JSON_PATH)
+    canviat = nova_etag != etag_anterior
+    if canviat:
+        session["ultima_etag"] = nova_etag
+    return jsonify({"canviat": canviat})

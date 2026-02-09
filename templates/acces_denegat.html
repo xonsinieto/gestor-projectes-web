@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-icon" style="background:#EF4444">X</div>
+        <h1>Acces denegat</h1>
+        <p>El compte <strong>{{ email }}</strong> no te permisos per accedir a aquesta aplicacio.</p>
+        <p style="color:#9CA3AF;font-size:0.85rem;margin-top:12px;">Contacta amb l'administrador per demanar acces.</p>
+        <a href="/auth/login" class="btn" style="margin-top:16px">Provar amb un altre compte</a>
+    </div>
+</div>
+{% endblock %}

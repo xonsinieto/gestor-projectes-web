@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- Barra superior -->
+<header class="top-bar">
+    <div class="top-bar-left">
+        <h1 class="app-title">GESTOR DE PROJECTES</h1>
+    </div>
+    <div class="top-bar-center">
+        <div id="filter-avatars" class="filter-avatars"></div>
+        <input type="search" id="cerca" class="search-input" placeholder="Cercar projecte...">
+    </div>
+    <div class="top-bar-right">
+        <button id="btn-notif" class="btn-icon notif-badge" data-count="0" title="Notificacions">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </button>
+        <button id="btn-menu" class="btn-icon" title="Opcions">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="user-label">{{ usuari_actual }}</div>
+        <a href="/auth/logout" class="btn-icon" title="Tancar sessio">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </a>
+    </div>
+</header>
+
+<!-- Contingut principal -->
+<main class="main-content">
+    <!-- Panel esquerre: llista projectes -->
+    <aside id="panel-projectes" class="panel-projectes">
+        <div class="panel-header">
+            <span class="panel-title">PROJECTES</span>
+            <button id="btn-afegir-projecte" class="btn btn-small btn-primary" title="Afegir projecte">+</button>
+        </div>
+        <div id="projectes-llista" class="projectes-llista"></div>
+    </aside>
+
+    <!-- Panel dret: detall projecte -->
+    <section id="panel-detall" class="panel-detall">
+        <div id="detall-header" class="detall-header hidden">
+            <div class="detall-header-top">
+                <button id="btn-tornar" class="btn-icon btn-tornar" title="Tornar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <button id="btn-afegir-tasca" class="btn btn-small btn-primary" title="Afegir tasques">+</button>
+                <h2 id="titol-projecte" class="detall-titol"></h2>
+                <span id="progres-projecte" class="detall-progres"></span>
+            </div>
+            <div id="overview-tasques" class="overview-tasques"></div>
+        </div>
+        <div id="tasques-llista" class="tasques-llista">
+            <div class="empty-state">
+                Selecciona un projecte per veure les seves tasques.
+            </div>
+        </div>
+    </section>
+</main>
+
+<!-- Overlay per dialogs -->
+<div id="overlay" class="overlay hidden" onclick="App.tancarDialog()"></div>
+<div id="dialog" class="dialog hidden"></div>
+
+<!-- Popup notificacions -->
+<div id="notif-popup" class="notif-popup hidden"></div>
+
+<!-- Config JS -->
+<script>
+    const CONFIG = {
+        usuariActual: {{ usuari_actual | tojson }},
+        estats: {{ ESTATS | tojson }},
+        etiquetes: {{ ETIQUETES_ESTAT | tojson }},
+        colors: {{ COLORS_ESTAT | tojson }},
+        colorsFons: {{ COLORS_ESTAT_FONS | tojson }},
+        colorsActiuText: {{ COLORS_ESTAT_ACTIU_TEXT | tojson }},
+        colorsActiuFons: {{ COLORS_ESTAT_ACTIU_FONS | tojson }},
+        PENDENT: {{ ESTAT_PENDENT | tojson }},
+        COMPLETADA: {{ ESTAT_COMPLETADA | tojson }},
+        PER_REVISAR: {{ ESTAT_PER_REVISAR | tojson }},
+    };
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/api.js"></script>
+<script src="/static/js/app.js"></script>
+<script src="/static/js/pwa.js"></script>
+{% endblock %}

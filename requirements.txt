@@ -1,0 +1,5 @@
+Flask>=3.0
+msal>=1.28
+requests>=2.31
+gunicorn>=22.0
+python-dotenv>=1.0

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <h1>Qui ets?</h1>
+        <p>Selecciona el teu nom de la llista d'usuaris:</p>
+        <form method="POST" action="/auth/select-user">
+            <div class="user-grid">
+                {% for usuari in usuaris %}
+                <button type="submit" name="usuari" value="{{ usuari }}" class="user-select-btn">
+                    <div class="avatar-circle" style="background-color: {{ ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'][loop.index0 % 8] }}">
+                        {{ usuari.split()[0][0] }}{{ usuari.split()[-1][0] if usuari.split()|length > 1 else '' }}
+                    </div>
+                    <span>{{ usuari }}</span>
+                </button>
+                {% endfor %}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

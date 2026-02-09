@@ -1,0 +1,685 @@
+/**
+ * Gestor de Projectes — Logica principal del frontend web.
+ */
+const App = {
+    projecteActual: null,
+    filtrePersona: '',
+    cercaText: '',
+    _cercaTimer: null,
+    _pollTimer: null,
+    usuaris: [],
+
+    // --- INICIALITZACIO ---
+
+    async init() {
+        this._bindEvents();
+        await this.carregarProjectes();
+        this._iniciarPolling();
+        this._carregarNotificacions();
+    },
+
+    _bindEvents() {
+        document.getElementById('btn-afegir-projecte').addEventListener('click', () => this.mostrarDialogAfegirProjecte());
+        document.getElementById('btn-afegir-tasca').addEventListener('click', () => this.mostrarDialogAfegirTasques());
+        document.getElementById('btn-tornar').addEventListener('click', () => this.tornarALlista());
+        document.getElementById('btn-notif').addEventListener('click', () => this.toggleNotificacions());
+        document.getElementById('cerca').addEventListener('input', (e) => this._onCerca(e.target.value));
+    },
+
+    // --- PROJECTES ---
+
+    async carregarProjectes() {
+        let url = '/api/projectes';
+        const params = [];
+        if (this.filtrePersona) params.push(`persona=${encodeURIComponent(this.filtrePersona)}`);
+        if (this.cercaText) params.push(`cerca=${encodeURIComponent(this.cercaText)}`);
+        if (params.length) url += '?' + params.join('&');
+
+        const projectes = await API.get(url);
+        if (!projectes) return;
+        this._renderProjectes(projectes);
+    },
+
+    _renderProjectes(projectes) {
+        const container = document.getElementById('projectes-llista');
+        if (!projectes.length) {
+            container.innerHTML = '<div class="empty-state">Cap projecte trobat.</div>';
+            return;
+        }
+
+        container.innerHTML = projectes.map(p => {
+            const seleccionat = this.projecteActual === p.nom_carpeta ? 'selected' : '';
+            const prioritari = p.prioritari ? '<span class="badge-prioritari">!</span>' : '';
+            const pct = p.percentatge;
+            return `
+                <div class="projecte-item ${seleccionat}" data-nom="${this._esc(p.nom_carpeta)}"
+                     onclick="App.seleccionarProjecte('${this._esc(p.nom_carpeta)}')">
+                    <div class="projecte-item-top">
+                        ${prioritari}
+                        <span class="projecte-codi">${this._esc(p.codi)}</span>
+                        <span class="projecte-desc">${this._esc(p.descripcio)}</span>
+                    </div>
+                    <div class="projecte-item-bottom">
+                        <div class="barra-progres">
+                            <div class="barra-progres-fill" style="width:${pct}%;background:${pct >= 100 ? '#10B981' : '#3B82F6'}"></div>
+                        </div>
+                        <span class="projecte-stats">${p.tasques_completades}/${p.total_tasques}</span>
+                    </div>
+                </div>`;
+        }).join('');
+    },
+
+    async seleccionarProjecte(nom) {
+        this.projecteActual = nom;
+        document.getElementById('panel-detall').classList.add('active');
+        await this._carregarDetall(nom);
+        this.carregarProjectes(); // Actualitzar seleccio visual
+    },
+
+    async _carregarDetall(nom) {
+        const proj = await API.get(`/api/projectes/${encodeURIComponent(nom)}`);
+        if (!proj) return;
+
+        this.usuaris = proj.usuaris || [];
+
+        // Header
+        document.getElementById('detall-header').classList.remove('hidden');
+        document.getElementById('titol-projecte').textContent = `${proj.codi} ${proj.descripcio}`;
+        document.getElementById('progres-projecte').textContent =
+            `${proj.tasques_completades}/${proj.total_tasques} (${proj.percentatge}%)`;
+
+        // Overview (cercles de tasques)
+        this._renderOverview(proj.tasques);
+
+        // Filtrar: no mostrar completades
+        let tasques = proj.tasques.filter(t => t.estat !== CONFIG.COMPLETADA);
+
+        // Ordenar: primer les propies
+        tasques.sort((a, b) => {
+            const aPropi = a.assignat === CONFIG.usuariActual ? 0 : 1;
+            const bPropi = b.assignat === CONFIG.usuariActual ? 0 : 1;
+            return aPropi - bPropi;
+        });
+
+        // Filtre per persona
+        if (this.filtrePersona) {
+            tasques = tasques.filter(t => t.assignat === this.filtrePersona);
+        }
+
+        this._renderTasques(tasques, nom);
+
+        // Actualitzar filter avatars
+        this._renderFilterAvatars(proj.usuaris);
+    },
+
+    _renderOverview(tasques) {
+        const container = document.getElementById('overview-tasques');
+        if (!tasques.length) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = tasques.map(t => {
+            const color = CONFIG.colors[t.estat] || '#9CA3AF';
+            const fons = CONFIG.colorsFons[t.estat] || '#F3F4F6';
+            const nomCurt = t.nom.length > 20 ? t.nom.substring(0, 18) + '...' : t.nom;
+            return `<div class="overview-dot" style="background:${fons};border:2px solid ${color}" title="${this._esc(t.nom)}">
+                <span style="color:${color}">${this._esc(nomCurt)}</span>
+            </div>`;
+        }).join('');
+    },
+
+    _renderTasques(tasques, nomProjecte) {
+        const container = document.getElementById('tasques-llista');
+        if (!tasques.length) {
+            container.innerHTML = '<div class="empty-state">Totes les tasques estan completades!</div>';
+            return;
+        }
+
+        container.innerHTML = tasques.map(t => this._renderFilaTasca(t, nomProjecte)).join('');
+    },
+
+    _renderFilaTasca(t, nomProjecte) {
+        const esPropi = t.assignat === CONFIG.usuariActual;
+        const fonsFila = esPropi ? '#DBEAFE' : '#FFFFFF';
+        const assignatHTML = this._renderAssignacio(t, nomProjecte);
+        const estatsHTML = this._renderBotonsEstat(t, nomProjecte);
+        const docHTML = t.document ? this._renderDocument(t, nomProjecte) : '';
+        const obsHTML = this._renderObservacions(t, nomProjecte);
+
+        return `
+            <div class="fila-tasca" style="background:${fonsFila}">
+                <div class="fila-tasca-top">
+                    <span class="tasca-nom">${this._esc(t.nom)}</span>
+                    <div class="tasca-accions">
+                        ${assignatHTML}
+                        ${estatsHTML}
+                        <button class="btn-icon btn-eliminar" onclick="App.confirmarEliminarTasca('${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Eliminar">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                </div>
+                ${docHTML}
+                ${obsHTML}
+            </div>`;
+    },
+
+    _renderAssignacio(t, nomProjecte) {
+        const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
+        return this.usuaris.map((u, i) => {
+            const actiu = t.assignat === u;
+            const inicials = u.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+            const color = colors[i % colors.length];
+            const opacitat = actiu ? '1' : '0.3';
+            return `<button class="avatar-btn" style="background:${color};opacity:${opacitat}"
+                        onclick="App.assignarTasca('${this._esc(nomProjecte)}','${this._esc(t.nom)}','${actiu ? '' : this._esc(u)}')"
+                        title="${this._esc(u)}">${inicials}</button>`;
+        }).join('');
+    },
+
+    _renderBotonsEstat(t, nomProjecte) {
+        return CONFIG.estats.filter(e => e !== CONFIG.COMPLETADA).map(estat => {
+            const actiu = t.estat === estat;
+            const etiqueta = CONFIG.etiquetes[estat];
+            const color = actiu ? CONFIG.colorsActiuText[estat] : '#6B7280';
+            const fons = actiu ? CONFIG.colorsActiuFons[estat] : '#F3F4F6';
+            return `<button class="btn-estat" style="color:${color};background:${fons}"
+                        onclick="App.canviarEstat('${this._esc(nomProjecte)}','${this._esc(t.nom)}','${estat}')"
+                    >${etiqueta}</button>`;
+        }).join('') +
+            `<button class="btn-estat btn-completar" style="color:#065F46;background:#D1FAE5"
+                onclick="App.canviarEstat('${this._esc(nomProjecte)}','${this._esc(t.nom)}','${CONFIG.COMPLETADA}')"
+            >Completada</button>`;
+    },
+
+    _renderDocument(t, nomProjecte) {
+        const nomFitxer = t.document.split('/').pop().split('\\').pop();
+        return `<div class="tasca-document">
+            <span class="doc-icon">&#128196;</span>
+            <span class="doc-nom" title="${this._esc(t.document)}">${this._esc(nomFitxer)}</span>
+            <button class="btn-icon" onclick="App.eliminarDocument('${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Desvincular">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>`;
+    },
+
+    _renderObservacions(t, nomProjecte) {
+        const obs = t.observacions || '';
+        return `<div class="tasca-observacions">
+            ${obs ? `<div class="obs-historial">${this._formatObs(obs)}</div>` : ''}
+            <div class="obs-input-row">
+                <input type="text" class="obs-input" placeholder="Afegir observacio..."
+                       id="obs-${this._esc(t.nom)}"
+                       onkeydown="if(event.key==='Enter')App.enviarObservacio('${this._esc(nomProjecte)}','${this._esc(t.nom)}')">
+                <button class="btn-enviar-obs" onclick="App.enviarObservacio('${this._esc(nomProjecte)}','${this._esc(t.nom)}')">&#10148;</button>
+            </div>
+        </div>`;
+    },
+
+    _formatObs(text) {
+        return text.split('\n').filter(l => l.trim()).map(l => {
+            if (l.startsWith('@')) {
+                const parts = l.split(':\n');
+                return `<div class="obs-line obs-author">${this._esc(l)}</div>`;
+            }
+            return `<div class="obs-line">${this._esc(l)}</div>`;
+        }).join('');
+    },
+
+    // --- ACCIONS ---
+
+    async canviarEstat(nomProjecte, nomTasca, nouEstat) {
+        if (nouEstat === CONFIG.PER_REVISAR) {
+            this.mostrarDialogRevisor(nomProjecte, nomTasca);
+            return;
+        }
+        if (nouEstat === CONFIG.COMPLETADA) {
+            this.mostrarDialogDocument(nomProjecte, nomTasca, 'completada');
+            return;
+        }
+        await API.patch(
+            `/api/projectes/${encodeURIComponent(nomProjecte)}/tasques/${encodeURIComponent(nomTasca)}`,
+            { estat: nouEstat }
+        );
+        await this._carregarDetall(nomProjecte);
+        this.carregarProjectes();
+    },
+
+    async assignarTasca(nomProjecte, nomTasca, usuari) {
+        await API.patch(
+            `/api/projectes/${encodeURIComponent(nomProjecte)}/tasques/${encodeURIComponent(nomTasca)}`,
+            { assignat: usuari }
+        );
+        await this._carregarDetall(nomProjecte);
+        this.carregarProjectes();
+    },
+
+    async enviarObservacio(nomProjecte, nomTasca) {
+        const input = document.getElementById(`obs-${nomTasca}`);
+        if (!input) return;
+        const text = input.value.trim();
+        if (!text) return;
+
+        // Obtenir observacions actuals
+        const proj = await API.get(`/api/projectes/${encodeURIComponent(nomProjecte)}`);
+        const tasca = proj.tasques.find(t => t.nom === nomTasca);
+        const obsActual = tasca ? tasca.observacions : '';
+        const novaObs = obsActual
+            ? `${obsActual}\n@${CONFIG.usuariActual}:\n${text}`
+            : `@${CONFIG.usuariActual}:\n${text}`;
+
+        await API.patch(
+            `/api/projectes/${encodeURIComponent(nomProjecte)}/tasques/${encodeURIComponent(nomTasca)}`,
+            { observacions: novaObs }
+        );
+        input.value = '';
+        await this._carregarDetall(nomProjecte);
+    },
+
+    async eliminarDocument(nomProjecte, nomTasca) {
+        await API.patch(
+            `/api/projectes/${encodeURIComponent(nomProjecte)}/tasques/${encodeURIComponent(nomTasca)}`,
+            { document: '' }
+        );
+        await this._carregarDetall(nomProjecte);
+    },
+
+    // --- DIALOGS ---
+
+    mostrarDialog(html) {
+        const dialog = document.getElementById('dialog');
+        const overlay = document.getElementById('overlay');
+        dialog.innerHTML = html;
+        dialog.classList.remove('hidden');
+        overlay.classList.remove('hidden');
+    },
+
+    tancarDialog() {
+        document.getElementById('dialog').classList.add('hidden');
+        document.getElementById('overlay').classList.add('hidden');
+    },
+
+    // Dialog: Afegir projecte
+    async mostrarDialogAfegirProjecte() {
+        const carpetes = await API.get('/api/carpetes-onedrive');
+        if (!carpetes) return;
+
+        const disponibles = carpetes.filter(c => !c.ja_afegit);
+        if (!disponibles.length) {
+            this.mostrarDialog(`
+                <div class="dialog-header"><h3>Afegir projecte</h3></div>
+                <div class="dialog-body"><p>No hi ha carpetes de projecte noves a OneDrive.</p></div>
+                <div class="dialog-footer"><button class="btn" onclick="App.tancarDialog()">Tancar</button></div>
+            `);
+            return;
+        }
+
+        const llista = disponibles.map(c =>
+            `<button class="carpeta-item" onclick="App._afegirProjecte('${this._esc(c.nom)}')">${this._esc(c.nom)}</button>`
+        ).join('');
+
+        this.mostrarDialog(`
+            <div class="dialog-header"><h3>Afegir projecte</h3></div>
+            <div class="dialog-body dialog-scroll">${llista}</div>
+            <div class="dialog-footer"><button class="btn" onclick="App.tancarDialog()">Cancel·lar</button></div>
+        `);
+    },
+
+    async _afegirProjecte(nom) {
+        await API.post('/api/projectes', { nom_carpeta: nom });
+        this.tancarDialog();
+        await this.carregarProjectes();
+        this.seleccionarProjecte(nom);
+    },
+
+    // Dialog: Afegir tasques
+    async mostrarDialogAfegirTasques() {
+        if (!this.projecteActual) return;
+        const plantilles = await API.get('/api/plantilles');
+        if (!plantilles) return;
+
+        let html = '<div class="dialog-header"><h3>Afegir tasques</h3></div><div class="dialog-body dialog-scroll">';
+
+        // Assignar a
+        const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
+        html += '<div class="assignar-row"><span>Assignar a:</span>';
+        html += this.usuaris.map((u, i) => {
+            const inicials = u.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+            return `<button class="avatar-btn avatar-selectable" data-usuari="${this._esc(u)}"
+                        style="background:${colors[i % colors.length]}"
+                        onclick="App._toggleAssignar(this)">${inicials}</button>`;
+        }).join('');
+        html += '<span id="assignar-nom" class="assignar-nom">Sense assignar</span></div>';
+
+        // Categories amb checkboxes
+        for (const [cat, docs] of Object.entries(plantilles)) {
+            html += `<div class="cat-header">${this._esc(cat)}</div>`;
+            docs.forEach(doc => {
+                const id = `cb-${doc.replace(/\s/g, '_')}`;
+                html += `<label class="checkbox-item"><input type="checkbox" id="${id}" value="${this._esc(doc)}"> ${this._esc(doc)}</label>`;
+            });
+        }
+
+        // Tasca personalitzada
+        html += `<div class="cat-header">Personalitzada</div>
+                 <input type="text" id="tasca-custom" class="input-full" placeholder="Nom de la tasca...">`;
+
+        html += '</div>';
+        html += `<div class="dialog-footer">
+            <button class="btn" onclick="App.tancarDialog()">Cancel·lar</button>
+            <button class="btn btn-primary" onclick="App._confirmarAfegirTasques()">Afegir</button>
+        </div>`;
+
+        this.mostrarDialog(html);
+    },
+
+    _selectedAssignar: '',
+
+    _toggleAssignar(btn) {
+        const nom = btn.dataset.usuari;
+        document.querySelectorAll('.avatar-selectable').forEach(b => b.classList.remove('selected'));
+        if (this._selectedAssignar === nom) {
+            this._selectedAssignar = '';
+            document.getElementById('assignar-nom').textContent = 'Sense assignar';
+        } else {
+            this._selectedAssignar = nom;
+            btn.classList.add('selected');
+            document.getElementById('assignar-nom').textContent = nom;
+        }
+    },
+
+    async _confirmarAfegirTasques() {
+        const checkboxes = document.querySelectorAll('#dialog .checkbox-item input:checked');
+        const noms = Array.from(checkboxes).map(cb => cb.value);
+        const custom = document.getElementById('tasca-custom')?.value.trim();
+        if (custom) noms.push(custom);
+        if (!noms.length) return;
+
+        await API.post(`/api/projectes/${encodeURIComponent(this.projecteActual)}/tasques`, {
+            noms: noms,
+            assignat: this._selectedAssignar,
+        });
+        this._selectedAssignar = '';
+        this.tancarDialog();
+        await this._carregarDetall(this.projecteActual);
+        this.carregarProjectes();
+    },
+
+    // Dialog: Seleccionar revisor (flux "Per revisar")
+    mostrarDialogRevisor(nomProjecte, nomTasca) {
+        const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
+        const avatars = this.usuaris.map((u, i) => {
+            const inicials = u.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+            return `<button class="avatar-btn-gran" style="background:${colors[i % colors.length]}"
+                        onclick="App._seleccionarRevisor('${this._esc(nomProjecte)}','${this._esc(nomTasca)}','${this._esc(u)}')">
+                        <span class="avatar-inicials">${inicials}</span>
+                        <span class="avatar-nom">${this._esc(u)}</span>
+                    </button>`;
+        }).join('');
+
+        this.mostrarDialog(`
+            <div class="dialog-header"><h3>Qui ha de revisar?</h3></div>
+            <div class="dialog-body"><div class="revisor-grid">${avatars}</div></div>
+            <div class="dialog-footer"><button class="btn" onclick="App.tancarDialog()">Cancel·lar</button></div>
+        `);
+    },
+
+    async _seleccionarRevisor(nomProjecte, nomTasca, revisor) {
+        this.tancarDialog();
+        // Obrir navegador de fitxers per vincular document
+        this.mostrarDialogDocument(nomProjecte, nomTasca, 'per_revisar', revisor);
+    },
+
+    // Dialog: Navegador de fitxers OneDrive
+    _currentDocCallback: null,
+
+    mostrarDialogDocument(nomProjecte, nomTasca, accio, revisor = '') {
+        this._currentDocCallback = { nomProjecte, nomTasca, accio, revisor };
+        this._navegarFitxers(nomProjecte, '');
+    },
+
+    async _navegarFitxers(nomProjecte, subcarpeta) {
+        const fitxers = await API.get(
+            `/api/fitxers/${encodeURIComponent(nomProjecte)}` +
+            (subcarpeta ? `?subcarpeta=${encodeURIComponent(subcarpeta)}` : '')
+        );
+        if (!fitxers) return;
+
+        let html = '<div class="dialog-header"><h3>Selecciona un document</h3>';
+        if (subcarpeta) {
+            const parts = subcarpeta.split('/');
+            parts.pop();
+            const parentPath = parts.join('/');
+            html += `<button class="btn btn-small" onclick="App._navegarFitxers('${this._esc(nomProjecte)}','${this._esc(parentPath)}')">&larr; Enrere</button>`;
+        }
+        html += '</div><div class="dialog-body dialog-scroll">';
+
+        if (!fitxers.length) {
+            html += '<div class="empty-state">Carpeta buida</div>';
+        }
+
+        fitxers.forEach(f => {
+            const fullPath = subcarpeta ? `${subcarpeta}/${f.nom}` : f.nom;
+            if (f.es_carpeta) {
+                html += `<button class="fitxer-item fitxer-carpeta" onclick="App._navegarFitxers('${this._esc(nomProjecte)}','${this._esc(fullPath)}')">
+                    &#128193; ${this._esc(f.nom)}
+                </button>`;
+            } else {
+                html += `<button class="fitxer-item fitxer-document" onclick="App._seleccionarFitxer('${this._esc(fullPath)}')">
+                    &#128196; ${this._esc(f.nom)}
+                </button>`;
+            }
+        });
+
+        html += '</div><div class="dialog-footer">';
+        html += `<button class="btn" onclick="App._saltarDocument()">Sense document</button>`;
+        html += '</div>';
+
+        this.mostrarDialog(html);
+    },
+
+    async _seleccionarFitxer(rutaRelativa) {
+        const cb = this._currentDocCallback;
+        if (!cb) return;
+        this.tancarDialog();
+
+        // La ruta completa relativa a CARPETA_PROJECTES es: nomProjecte/rutaRelativa
+        const docPath = `${cb.nomProjecte}/${rutaRelativa}`;
+        const data = { document: docPath };
+
+        if (cb.accio === 'per_revisar') {
+            data.estat = CONFIG.PER_REVISAR;
+            if (cb.revisor) data.revisor = cb.revisor;
+        } else if (cb.accio === 'completada') {
+            data.estat = CONFIG.COMPLETADA;
+        }
+
+        await API.patch(
+            `/api/projectes/${encodeURIComponent(cb.nomProjecte)}/tasques/${encodeURIComponent(cb.nomTasca)}`,
+            data
+        );
+        this._currentDocCallback = null;
+        await this._carregarDetall(cb.nomProjecte);
+        this.carregarProjectes();
+    },
+
+    async _saltarDocument() {
+        const cb = this._currentDocCallback;
+        if (!cb) return;
+        this.tancarDialog();
+
+        const data = {};
+        if (cb.accio === 'per_revisar') {
+            data.estat = CONFIG.PER_REVISAR;
+            if (cb.revisor) data.revisor = cb.revisor;
+        } else if (cb.accio === 'completada') {
+            data.estat = CONFIG.COMPLETADA;
+        }
+
+        await API.patch(
+            `/api/projectes/${encodeURIComponent(cb.nomProjecte)}/tasques/${encodeURIComponent(cb.nomTasca)}`,
+            data
+        );
+        this._currentDocCallback = null;
+        await this._carregarDetall(cb.nomProjecte);
+        this.carregarProjectes();
+    },
+
+    // Dialog: Confirmar eliminacio
+    confirmarEliminarTasca(nomProjecte, nomTasca) {
+        this.mostrarDialog(`
+            <div class="dialog-header"><h3>Eliminar tasca</h3></div>
+            <div class="dialog-body"><p>Segur que vols eliminar "${this._esc(nomTasca)}"?</p></div>
+            <div class="dialog-footer">
+                <button class="btn" onclick="App.tancarDialog()">Cancel·lar</button>
+                <button class="btn btn-danger" onclick="App._eliminarTasca('${this._esc(nomProjecte)}','${this._esc(nomTasca)}')">Eliminar</button>
+            </div>
+        `);
+    },
+
+    async _eliminarTasca(nomProjecte, nomTasca) {
+        await API.del(`/api/projectes/${encodeURIComponent(nomProjecte)}/tasques/${encodeURIComponent(nomTasca)}`);
+        this.tancarDialog();
+        await this._carregarDetall(nomProjecte);
+        this.carregarProjectes();
+    },
+
+    confirmarEliminarProjecte(nom) {
+        this.mostrarDialog(`
+            <div class="dialog-header"><h3>Eliminar projecte</h3></div>
+            <div class="dialog-body"><p>Segur que vols eliminar "${this._esc(nom)}"?</p></div>
+            <div class="dialog-footer">
+                <button class="btn" onclick="App.tancarDialog()">Cancel·lar</button>
+                <button class="btn btn-danger" onclick="App._eliminarProjecte('${this._esc(nom)}')">Eliminar</button>
+            </div>
+        `);
+    },
+
+    async _eliminarProjecte(nom) {
+        await API.del(`/api/projectes/${encodeURIComponent(nom)}`);
+        this.tancarDialog();
+        if (this.projecteActual === nom) {
+            this.projecteActual = null;
+            document.getElementById('detall-header').classList.add('hidden');
+            document.getElementById('tasques-llista').innerHTML = '<div class="empty-state">Selecciona un projecte.</div>';
+        }
+        await this.carregarProjectes();
+    },
+
+    // --- FILTRE I CERCA ---
+
+    _renderFilterAvatars(usuaris) {
+        const container = document.getElementById('filter-avatars');
+        const colors = ['#3B82F6','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#F97316'];
+
+        let html = `<button class="filter-btn ${!this.filtrePersona ? 'active' : ''}" onclick="App.filtrar('')">Tots</button>`;
+        usuaris.forEach((u, i) => {
+            const inicials = u.split(' ').map(p => p[0]).join('').substring(0, 2).toUpperCase();
+            const actiu = this.filtrePersona === u ? 'active' : '';
+            html += `<button class="avatar-btn filter-avatar ${actiu}" style="background:${colors[i % colors.length]}"
+                        onclick="App.filtrar('${this._esc(u)}')" title="${this._esc(u)}">${inicials}</button>`;
+        });
+        container.innerHTML = html;
+    },
+
+    async filtrar(persona) {
+        this.filtrePersona = persona;
+        if (this.projecteActual) {
+            await this._carregarDetall(this.projecteActual);
+        }
+        await this.carregarProjectes();
+    },
+
+    _onCerca(text) {
+        clearTimeout(this._cercaTimer);
+        this._cercaTimer = setTimeout(() => {
+            this.cercaText = text;
+            this.carregarProjectes();
+        }, 300);
+    },
+
+    // --- NOTIFICACIONS ---
+
+    async _carregarNotificacions() {
+        const notifs = await API.get('/api/notificacions');
+        if (!notifs) return;
+
+        const btn = document.getElementById('btn-notif');
+        btn.dataset.count = notifs.length;
+        btn.classList.toggle('has-notifs', notifs.length > 0);
+    },
+
+    async toggleNotificacions() {
+        const popup = document.getElementById('notif-popup');
+        if (!popup.classList.contains('hidden')) {
+            popup.classList.add('hidden');
+            return;
+        }
+
+        const notifs = await API.get('/api/notificacions');
+        if (!notifs || !notifs.length) {
+            popup.innerHTML = '<div class="notif-empty">Cap notificacio nova</div>';
+        } else {
+            let html = `<div class="notif-header">
+                <span>Notificacions (${notifs.length})</span>
+                <button class="btn btn-small" onclick="App._marcarTotesLlegides()">Llegir totes</button>
+            </div>`;
+            notifs.forEach(n => {
+                const accioText = CONFIG.etiquetes[n.accio] || n.accio;
+                html += `<div class="notif-item">
+                    <div class="notif-text"><strong>${this._esc(n.de)}</strong> ha marcat <em>${this._esc(n.tasca)}</em> com a ${accioText}</div>
+                    <div class="notif-meta">${this._esc(n.projecte)}</div>
+                    <button class="btn-icon" onclick="App._marcarLlegida('${n.id}',this.closest('.notif-item'))">&#10003;</button>
+                </div>`;
+            });
+            popup.innerHTML = html;
+        }
+        popup.classList.remove('hidden');
+    },
+
+    async _marcarLlegida(id, element) {
+        await API.post(`/api/notificacions/${id}/llegida`);
+        if (element) element.remove();
+        this._carregarNotificacions();
+    },
+
+    async _marcarTotesLlegides() {
+        await API.post('/api/notificacions/totes-llegides');
+        document.getElementById('notif-popup').classList.add('hidden');
+        this._carregarNotificacions();
+    },
+
+    // --- RESPONSIVE: TORNAR ---
+
+    tornarALlista() {
+        document.getElementById('panel-detall').classList.remove('active');
+    },
+
+    // --- POLLING ---
+
+    _iniciarPolling() {
+        this._pollTimer = setInterval(async () => {
+            try {
+                const resp = await API.get('/api/ha-canviat');
+                if (resp && resp.canviat) {
+                    await this.carregarProjectes();
+                    if (this.projecteActual) {
+                        await this._carregarDetall(this.projecteActual);
+                    }
+                    this._carregarNotificacions();
+                }
+            } catch (e) { /* ignora errors de polling */ }
+        }, 15000);
+    },
+
+    // --- UTILS ---
+
+    _esc(str) {
+        if (!str) return '';
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
+};
+
+// Iniciar quan el DOM estigui llest
+document.addEventListener('DOMContentLoaded', () => App.init());

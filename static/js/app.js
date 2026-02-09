@@ -10,6 +10,7 @@ const App = {
     _pollTimer: null,
     usuaris: [],
     _projectesData: [],
+    _resumUsuaris: [],
     _fotosCache: {},  // Cache: nom -> url (blob o fallback)
 
     // Colors d'usuari (mateixos que desktop)
@@ -106,11 +107,32 @@ const App = {
         if (this.mostrarArxivats) params.push('arxivats=1');
         if (params.length) url += '?' + params.join('&');
 
-        const projectes = await API.get(url);
-        if (!projectes) return;
+        const resp = await API.get(url);
+        if (!resp) return;
+
+        // Resposta ara es objecte: {projectes, usuaris, resum}
+        const projectes = resp.projectes || [];
         this._projectesData = projectes;
+        this.usuaris = resp.usuaris || this.usuaris;
+        this._resumUsuaris = resp.resum || [];
+
         this._renderProjectes(projectes);
         this._renderBarraInferior();
+
+        // Carregar fotos en background si no estan cached
+        if (this.usuaris.length && !this._fotosLoaded) {
+            this._fotosLoaded = true;
+            this._carregarTotesFotos().then(() => {
+                // Re-render amb fotos un cop carregades
+                this._renderProjectes(this._projectesData);
+                this._renderFilterAvatars(this.usuaris);
+            });
+        }
+
+        // Render filter avatars si tenim usuaris
+        if (this.usuaris.length) {
+            this._renderFilterAvatars(this.usuaris);
+        }
     },
 
     _renderProjectes(projectes) {
@@ -127,7 +149,7 @@ const App = {
             const colorBarra = this._colorPerPercentatge(pct);
             const colorPct = pct >= 100 ? '#10B981' : '#374151';
 
-            // Avatars dels usuaris implicats (amb fotos si disponibles)
+            // Avatars dels usuaris implicats
             let avatarsHTML = '';
             if (p.usuaris_implicats && p.usuaris_implicats.length) {
                 avatarsHTML = '<div class="projecte-avatars">';
@@ -164,8 +186,11 @@ const App = {
     async seleccionarProjecte(nom) {
         this.projecteActual = nom;
         document.getElementById('panel-detall').classList.add('active');
-        await this._carregarDetall(nom);
-        this.carregarProjectes();
+        // Carregar detall i actualitzar llista en paral·lel
+        await Promise.all([
+            this._carregarDetall(nom),
+            this.carregarProjectes(),
+        ]);
     },
 
     async _carregarDetall(nom) {
@@ -173,8 +198,7 @@ const App = {
         if (!proj) return;
 
         this.usuaris = proj.usuaris || [];
-        // Carregar fotos en background (no bloquejar)
-        this._carregarTotesFotos();
+        this._resumUsuaris = proj.resum || this._resumUsuaris;
 
         // Header
         document.getElementById('detall-header').classList.remove('hidden');
@@ -185,7 +209,7 @@ const App = {
         // Overview (cercles de tasques)
         this._renderOverview(proj.tasques);
 
-        // Filtrar: no mostrar completades
+        // Filtrar: no mostrar completades a la llista
         let tasques = proj.tasques.filter(t => t.estat !== CONFIG.COMPLETADA);
 
         // Ordenar: primer les propies
@@ -202,10 +226,8 @@ const App = {
 
         this._renderTasques(tasques, nom);
 
-        // Actualitzar filter avatars
+        // Actualitzar filter avatars i barra inferior
         this._renderFilterAvatars(proj.usuaris);
-
-        // Actualitzar barra inferior
         this._renderBarraInferior();
     },
 
@@ -220,7 +242,9 @@ const App = {
             const color = CONFIG.colors[t.estat] || '#9CA3AF';
             const fons = CONFIG.colorsFons[t.estat] || '#F3F4F6';
             const nomCurt = t.nom.length > 20 ? t.nom.substring(0, 18) + '...' : t.nom;
-            return `<div class="overview-dot" style="background:${fons};border:2px solid ${color}" title="${this._esc(t.nom)}">
+            const completada = t.estat === CONFIG.COMPLETADA;
+            const fontWeight = completada ? 'font-weight:700;' : '';
+            return `<div class="overview-dot" style="background:${fons};border:2px solid ${color};${fontWeight}" title="${this._esc(t.nom)}">
                 <span style="color:${color}">${this._esc(nomCurt)}</span>
             </div>`;
         }).join('');
@@ -336,26 +360,26 @@ const App = {
         }).join('');
     },
 
-    // --- BARRA INFERIOR (RESUM) ---
+    // --- BARRA INFERIOR (RESUM) — FORMAT IDENTIC AL DESKTOP ---
 
     _renderBarraInferior() {
         const container = document.getElementById('bottom-resum');
         const syncEl = document.getElementById('bottom-sync');
         if (!container) return;
 
-        if (!this.usuaris.length) {
+        if (!this._resumUsuaris || !this._resumUsuaris.length) {
             container.innerHTML = '';
             if (syncEl) syncEl.textContent = '';
             return;
         }
 
-        const html = this.usuaris.map(u => {
-            const inicials = this._inicialsUsuari(u);
-            const color = this._colorPerUsuari(u);
-            return `<span class="bottom-usuari"><span class="projecte-avatar" style="background:${color};width:18px;height:18px;font-size:0.5rem;vertical-align:middle;display:inline-flex">${inicials}</span> <strong>${this._esc(u)}</strong></span>`;
-        }).join('');
+        // Format desktop: "Nom: X env. / Y en curs / Z per rev. / W fetes"
+        // Separador: "   |   "
+        const parts = this._resumUsuaris.map(u => {
+            return `<strong>${this._esc(u.nom)}</strong>: ${u.enviades} env. / ${u.en_curs} en curs / ${u.per_revisar} per rev. / ${u.fetes} fetes`;
+        });
 
-        container.innerHTML = html;
+        container.innerHTML = `<span class="bottom-text">${parts.join('&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;')}</span>`;
 
         if (syncEl) {
             const ara = new Date();

@@ -13,6 +13,9 @@ from services.data_manager_web import DataManagerWeb
 
 api_bp = Blueprint("api", __name__)
 
+# Cache de fotos a nivell de servidor (persistent entre requests)
+_foto_cache: dict[str, tuple[bytes, str] | None] = {}
+
 
 def _get_dm():
     """Obte un DataManagerWeb autenticat. Retorna (dm, error_response)."""
@@ -82,7 +85,12 @@ def llistar_projectes():
     # Ordenar: prioritaris primer, despres per nom descendent (mes nous primer)
     resultat.sort(key=lambda p: p["nom_carpeta"], reverse=True)
     resultat.sort(key=lambda p: not p["prioritari"])
-    return jsonify(resultat)
+
+    return jsonify({
+        "projectes": resultat,
+        "usuaris": dm.usuaris,
+        "resum": dm.obtenir_resum_usuaris(),
+    })
 
 
 @api_bp.route("/projectes/<path:nom>")
@@ -118,6 +126,7 @@ def detall_projecte(nom):
         "arxivat": proj.arxivat,
         "tasques": tasques,
         "usuaris": dm.usuaris,
+        "resum": dm.obtenir_resum_usuaris(),
     })
 
 
@@ -240,10 +249,9 @@ def actualitzar_tasca(nom, nom_tasca):
 
     if "estat" in data:
         nou_estat = data["estat"]
-        antic_estat = tasca.estat
         tasca.actualitzar_estat(nou_estat)
 
-        # Enviar notificacio si cal
+        # Notificacions s'acumulen en memoria (es desen amb desar())
         if nou_estat == config_web.ESTAT_ENVIAT and tasca.assignat:
             dm.enviar_notificacio(
                 de=usuari, per_a=tasca.assignat, projecte=nom,
@@ -276,6 +284,7 @@ def actualitzar_tasca(nom, nom_tasca):
         tasca.document = data["document"]
         tasca.data_modificacio = datetime.now().isoformat(timespec="seconds")
 
+    # UNA sola escriptura (projectes + notificacions acumulades)
     dm.desar(projectes)
     return jsonify({"ok": True})
 
@@ -300,6 +309,7 @@ def marcar_notif_llegida(notif_id):
     if err:
         return err
 
+    dm.carregar()
     dm.marcar_llegida(notif_id)
     return jsonify({"ok": True})
 
@@ -310,6 +320,7 @@ def marcar_totes_notifs_llegides():
     if err:
         return err
 
+    dm.carregar()
     dm.marcar_totes_llegides(_get_usuari())
     return jsonify({"ok": True})
 
@@ -357,19 +368,34 @@ def eliminar_usuari(nom):
 
 @api_bp.route("/foto/<path:nom>")
 def obtenir_foto_usuari(nom):
-    """Serveix la foto d'un usuari des d'OneDrive."""
+    """Serveix la foto d'un usuari des d'OneDrive.
+    Naming: primer mot en minuscula (ex: 'Alfons Vigas' -> 'alfons.png').
+    """
+    nom_base = nom.split()[0].lower() if nom.strip() else nom.lower()
+
+    # Cache servidor (fotos no canvien gaire)
+    if nom_base in _foto_cache:
+        cached = _foto_cache[nom_base]
+        if cached is None:
+            return "", 404
+        return Response(cached[0], mimetype=cached[1],
+                        headers={"Cache-Control": "public, max-age=3600"})
+
     token = get_access_token()
     if not token:
+        _foto_cache[nom_base] = None
         return "", 404
 
     graph = GraphClient(token)
-    # Provar extensions comunes
     for ext in ["png", "jpg", "jpeg"]:
-        foto = graph.obtenir_foto(f"{nom}.{ext}")
+        foto = graph.obtenir_foto(f"{nom_base}.{ext}")
         if foto:
             content_type = "image/png" if ext == "png" else "image/jpeg"
+            _foto_cache[nom_base] = (foto, content_type)
             return Response(foto, mimetype=content_type,
                             headers={"Cache-Control": "public, max-age=3600"})
+
+    _foto_cache[nom_base] = None
     return "", 404
 
 
@@ -421,4 +447,5 @@ def ha_canviat():
     canviat = nova_etag != etag_anterior
     if canviat:
         session["ultima_etag"] = nova_etag
+        DataManagerWeb.invalidar_cache()
     return jsonify({"canviat": canviat})

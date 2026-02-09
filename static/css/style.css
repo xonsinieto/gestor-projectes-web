@@ -239,10 +239,10 @@ body {
     padding: 6px 16px; background: #FFFFFF; border-top: 1px solid #E5E7EB;
     min-height: 36px; flex-shrink: 0;
 }
-.bottom-resum { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
-.bottom-usuari { font-size: 0.72rem; color: #6B7280; white-space: nowrap; }
-.bottom-usuari strong { color: #374151; }
-.bottom-sync { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; }
+.bottom-resum { display: flex; align-items: center; flex: 1; min-width: 0; overflow: hidden; }
+.bottom-text { font-size: 0.75rem; color: #6B7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bottom-text strong { color: #374151; font-weight: 700; }
+.bottom-sync { font-size: 0.72rem; color: #9CA3AF; white-space: nowrap; flex-shrink: 0; }
 
 /* === DIALOG / OVERLAY === */
 .overlay {

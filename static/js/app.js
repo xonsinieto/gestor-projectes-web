@@ -205,8 +205,9 @@ const App = {
         // Header
         document.getElementById('detall-header').classList.remove('hidden');
         document.getElementById('titol-projecte').textContent = `${proj.codi} ${proj.descripcio}`;
-        document.getElementById('progres-projecte').textContent =
-            `${proj.tasques_completades}/${proj.total_tasques} (${proj.percentatge}%)`;
+        const progresEl = document.getElementById('progres-projecte');
+        progresEl.textContent = `${proj.tasques_completades}/${proj.total_tasques} completades (${proj.percentatge}%)`;
+        progresEl.style.color = proj.percentatge >= 100 ? '#10B981' : '#374151';
 
         // Overview (cercles de tasques)
         this._renderOverview(proj.tasques);
@@ -240,14 +241,42 @@ const App = {
             return;
         }
 
-        container.innerHTML = tasques.map(t => {
+        // Filtrar per persona si cal
+        let tasquesFiltrades = tasques;
+        if (this.filtrePersona) {
+            tasquesFiltrades = tasques.filter(t => t.assignat === this.filtrePersona);
+        }
+        if (!tasquesFiltrades.length) {
+            container.innerHTML = '';
+            return;
+        }
+
+        container.innerHTML = tasquesFiltrades.map(t => {
             const color = CONFIG.colors[t.estat] || '#9CA3AF';
-            const fons = CONFIG.colorsFons[t.estat] || '#F3F4F6';
-            const nomCurt = t.nom.length > 20 ? t.nom.substring(0, 18) + '...' : t.nom;
             const completada = t.estat === CONFIG.COMPLETADA;
-            const fontWeight = completada ? 'font-weight:700;' : '';
-            return `<div class="overview-dot" style="background:${fons};border:2px solid ${color};${fontWeight}" title="${this._esc(t.nom)}">
-                <span style="color:${color}">${this._esc(nomCurt)}</span>
+            const textColor = completada ? '#1F2937' : '#6B7280';
+            const fontWeight = completada ? ' completada' : '';
+            const docClick = completada && t.document
+                ? `onclick="App.obrirDocument('${this._esc(t.document)}')"` : '';
+            const cursorStyle = completada && t.document ? 'cursor:pointer;' : '';
+
+            // Avatar petit gris amb vora del color de l'estat (identic al desktop)
+            let avatarHTML = '';
+            if (t.assignat) {
+                const fotoUrl = this._fotosCache[t.assignat];
+                if (fotoUrl) {
+                    avatarHTML = `<img src="${fotoUrl}" class="overview-avatar" style="border:2px solid ${color}">`;
+                } else {
+                    const inicials = this._inicialsUsuari(t.assignat);
+                    const bgColor = this._colorPerUsuari(t.assignat);
+                    avatarHTML = `<span class="overview-avatar-inicials" style="background:${bgColor};border:2px solid ${color}">${inicials}</span>`;
+                }
+            }
+
+            return `<div class="overview-item">
+                <span class="overview-dot-circle" style="color:${color}">●</span>
+                <span class="overview-nom${fontWeight}" style="color:${textColor};${cursorStyle}" ${docClick} title="${this._esc(t.nom)}">${this._esc(t.nom)}</span>
+                ${avatarHTML}
             </div>`;
         }).join('');
     },

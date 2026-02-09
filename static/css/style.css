@@ -113,15 +113,18 @@ body {
     padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; white-space: nowrap;
 }
 
-/* === FILA TASCA === */
+/* === FILA TASCA (layout 2 files com desktop) === */
 .fila-tasca {
-    padding: 10px 12px; margin-bottom: 6px; border-radius: 6px;
+    padding: 8px 10px; margin-bottom: 6px; border-radius: 6px;
     border: 1px solid #E5E7EB;
 }
 .fila-tasca.propia { background: #DBEAFE; border-color: #BFDBFE; }
-.fila-tasca-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.tasca-nom { font-weight: 600; font-size: 0.9rem; flex: 1; min-width: 120px; }
-.tasca-accions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.fila-tasca-row1 { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
+.fila-tasca-row2 { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
+.tasca-nom { font-weight: 700; font-size: 0.87rem; }
+.tasca-avatars { display: flex; gap: 2px; align-items: center; }
+.tasca-estats { display: flex; gap: 3px; align-items: center; }
+.tasca-row2-right { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 
 /* === AVATAR BTN === */
 .avatar-btn {
@@ -159,13 +162,28 @@ body {
 .btn-enviar-rapid:hover { background: #047857; }
 .btn-enviar-rapid:active { transform: scale(0.95); }
 
-/* === DOCUMENT === */
-.tasca-document {
-    display: flex; align-items: center; gap: 6px; padding: 4px 0;
-    margin-top: 4px; font-size: 0.8rem; color: #3B82F6;
+/* === DOCUMENT INLINE (pill verd com desktop) === */
+.btn-document {
+    height: 22px; border: none; border-radius: 11px;
+    background: #D1FAE5; color: #065F46; font-size: 0.72rem;
+    padding: 0 10px; cursor: pointer; white-space: nowrap;
+    max-width: 180px; overflow: hidden; text-overflow: ellipsis;
+    display: inline-flex; align-items: center;
 }
-.doc-icon { font-size: 1rem; }
-.doc-nom { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-document:hover { background: #A7F3D0; }
+.btn-document:active { transform: scale(0.97); }
+.btn-eliminar-doc {
+    width: 20px; height: 22px; border: none; border-radius: 11px;
+    background: #FEE2E2; color: #991B1B; font-size: 0.8rem;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.btn-eliminar-doc:hover { background: #FECACA; }
+.btn-eliminar-tasca {
+    width: 20px; height: 22px; border: none; border-radius: 11px;
+    background: #E5E7EB; color: #9CA3AF; font-size: 0.9rem;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.btn-eliminar-tasca:hover { background: #D1D5DB; }
 
 /* === OBSERVACIONS === */
 .tasca-observacions { margin-top: 6px; }
@@ -210,7 +228,6 @@ body {
     align-items: center; justify-content: center; color: #6B7280; flex-shrink: 0;
 }
 .btn-icon:active { background: #F3F4F6; }
-.btn-eliminar { width: 28px; height: 28px; }
 
 /* === NOTIFICACIONS === */
 .notif-badge { position: relative; }
@@ -367,4 +384,7 @@ body {
     .obs-input { min-height: 44px; }
     .btn-enviar-obs { width: 44px; height: 44px; }
     .projecte-avatar { width: 28px; height: 28px; font-size: 0.6rem; }
+    .btn-document { height: 28px; font-size: 0.78rem; }
+    .btn-eliminar-doc { width: 28px; height: 28px; }
+    .btn-eliminar-tasca { width: 28px; height: 28px; }
 }

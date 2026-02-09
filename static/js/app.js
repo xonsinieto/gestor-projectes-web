@@ -265,22 +265,25 @@ const App = {
         const classPropi = esPropi ? ' propia' : '';
         const assignatHTML = this._renderAssignacio(t, nomProjecte);
         const estatsHTML = this._renderBotonsEstat(t, nomProjecte);
-        const docHTML = t.document ? this._renderDocument(t, nomProjecte) : '';
+        const docInlineHTML = t.document ? this._renderDocumentInline(t, nomProjecte) : '';
         const obsHTML = this._renderObservacions(t, nomProjecte);
 
+        // Layout identic al desktop: 2 files
+        // Fila 1: nom tasca + avatars assignacio
+        // Fila 2: botons estat (pills) + enviar + document (pill verd) + x eliminar
         return `
             <div class="fila-tasca${classPropi}">
-                <div class="fila-tasca-top">
+                <div class="fila-tasca-row1">
                     <span class="tasca-nom">${this._esc(t.nom)}</span>
-                    <div class="tasca-accions">
-                        ${assignatHTML}
-                        ${estatsHTML}
-                        <button class="btn-icon btn-eliminar" onclick="App.confirmarEliminarTasca('${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Eliminar">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        </button>
+                    <div class="tasca-avatars">${assignatHTML}</div>
+                </div>
+                <div class="fila-tasca-row2">
+                    <div class="tasca-estats">${estatsHTML}</div>
+                    <div class="tasca-row2-right">
+                        ${docInlineHTML}
+                        <button class="btn-eliminar-tasca" onclick="App.confirmarEliminarTasca('${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Eliminar">&times;</button>
                     </div>
                 </div>
-                ${docHTML}
                 ${obsHTML}
             </div>`;
     },
@@ -327,15 +330,20 @@ const App = {
         return enviarHTML + botons;
     },
 
-    _renderDocument(t, nomProjecte) {
+    _renderDocumentInline(t, nomProjecte) {
+        // Pill verd inline a la fila 2 (identic al desktop)
         const nomFitxer = t.document.split('/').pop().split('\\').pop();
-        return `<div class="tasca-document">
-            <span class="doc-icon">&#128196;</span>
-            <span class="doc-nom" title="${this._esc(t.document)}">${this._esc(nomFitxer)}</span>
-            <button class="btn-icon" onclick="App.eliminarDocument('${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Desvincular">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-        </div>`;
+        return `<button class="btn-document" onclick="App.obrirDocument('${this._esc(t.document)}')" title="${this._esc(t.document)}">
+                    &#128196; ${this._esc(nomFitxer)}
+                </button>
+                <button class="btn-eliminar-doc" onclick="App.eliminarDocument('${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Desvincular">&times;</button>`;
+    },
+
+    async obrirDocument(rutaDocument) {
+        const resp = await API.get(`/api/obrir-document/${encodeURIComponent(rutaDocument)}`);
+        if (resp && resp.url) {
+            window.open(resp.url, '_blank');
+        }
     },
 
     _renderObservacions(t, nomProjecte) {

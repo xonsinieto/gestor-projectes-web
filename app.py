@@ -5,6 +5,7 @@ Punt d'entrada principal.
 from datetime import timedelta
 
 from flask import Flask
+from flask_session import Session
 
 import config_web
 
@@ -13,13 +14,17 @@ def create_app():
     app = Flask(__name__)
     app.secret_key = config_web.SECRET_KEY
 
-    # --- Seguretat de la sessio ---
+    # --- Sessions al servidor (el token OAuth es massa gran per cookies) ---
     app.config.update(
+        SESSION_TYPE="filesystem",
+        SESSION_FILE_DIR="/tmp/flask_sessions",
+        SESSION_PERMANENT=True,
         SESSION_COOKIE_SECURE=True,       # Nomes HTTPS
         SESSION_COOKIE_HTTPONLY=True,      # No accessible des de JavaScript
         SESSION_COOKIE_SAMESITE="Lax",    # Proteccio CSRF basica
         PERMANENT_SESSION_LIFETIME=timedelta(hours=12),  # Sessio dura 12h
     )
+    Session(app)
 
     # Passar constants als templates Jinja2
     app.jinja_env.globals.update(

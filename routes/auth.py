@@ -9,40 +9,17 @@ import config_web
 auth_bp = Blueprint("auth", __name__)
 
 
-def _build_msal_app(cache=None):
+def _build_msal_app():
     return msal.ConfidentialClientApplication(
         config_web.AZURE_CLIENT_ID,
         authority=config_web.AZURE_AUTHORITY,
         client_credential=config_web.AZURE_CLIENT_SECRET,
-        token_cache=cache,
     )
-
-
-def _get_token_from_cache():
-    """Intenta obtenir un token valid des de la cache de la sessio."""
-    cache = msal.SerializableTokenCache()
-    cache_data = session.get("token_cache")
-    if cache_data:
-        cache.deserialize(cache_data)
-
-    app = _build_msal_app(cache)
-    accounts = app.get_accounts()
-    if not accounts:
-        return None
-
-    result = app.acquire_token_silent(config_web.AZURE_SCOPES, account=accounts[0])
-    if cache.has_state_changed:
-        session["token_cache"] = cache.serialize()
-
-    return result
 
 
 def get_access_token():
     """Retorna el token d'acces actual o None si cal re-autenticar."""
-    result = _get_token_from_cache()
-    if result and "access_token" in result:
-        return result["access_token"]
-    return None
+    return session.get("access_token")
 
 
 @auth_bp.route("/login")
@@ -64,8 +41,7 @@ def callback():
     if not code:
         return redirect(url_for("views.index"))
 
-    cache = msal.SerializableTokenCache()
-    app = _build_msal_app(cache)
+    app = _build_msal_app()
     redirect_uri = url_for("auth.callback", _external=True)
 
     result = app.acquire_token_by_authorization_code(
@@ -85,8 +61,8 @@ def callback():
         if config_web.EMAILS_AUTORITZATS and email not in config_web.EMAILS_AUTORITZATS:
             return render_template("acces_denegat.html", email=email), 403
 
-        session["token_cache"] = cache.serialize()
-        session["ms_user"] = claims
+        # Guardem nomes el token i email (la cookie te limit de 4KB)
+        session["access_token"] = result["access_token"]
         session["ms_email"] = email
         session.permanent = True  # Activa PERMANENT_SESSION_LIFETIME (12h)
         return redirect(url_for("auth.select_user"))

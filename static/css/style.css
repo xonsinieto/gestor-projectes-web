@@ -164,14 +164,13 @@ body {
 .fila-tasca.propia { background: #DBEAFE; border-color: #BFDBFE; }
 .fila-tasca-row1 { display: flex; align-items: center; gap: 8px; padding-bottom: 4px; }
 .fila-tasca-row2 { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; }
-.fila-tasca-carpeta { padding-top: 3px; }
-.btn-obrir-carpeta {
-    height: 20px; border: none; border-radius: 10px;
-    background: #E5E7EB; color: #6B7280; font-size: 0.7rem;
-    padding: 0 10px; cursor: pointer; white-space: nowrap;
+.btn-carpeta-doc {
+    width: 28px; height: 22px; border: none; border-radius: 11px;
+    background: #E5E7EB; color: #6B7280; font-size: 0.8rem;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
 }
-.btn-obrir-carpeta:hover { background: #D1D5DB; }
-.btn-obrir-carpeta:active { transform: scale(0.97); }
+.btn-carpeta-doc:hover { background: #D1D5DB; }
+.btn-carpeta-doc:active { transform: scale(0.95); }
 .tasca-nom { font-weight: 700; font-size: 0.87rem; }
 .tasca-avatars { display: flex; gap: 2px; align-items: center; }
 .tasca-estats { display: flex; gap: 3px; align-items: center; }
@@ -442,4 +441,5 @@ body {
     .btn-document { height: 28px; font-size: 0.78rem; }
     .btn-eliminar-doc { width: 28px; height: 28px; }
     .btn-eliminar-tasca { width: 28px; height: 28px; }
+    .btn-carpeta-doc { width: 34px; height: 28px; font-size: 0.9rem; }
 }

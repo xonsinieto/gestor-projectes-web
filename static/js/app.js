@@ -144,7 +144,9 @@ const App = {
 
         container.innerHTML = projectes.map(p => {
             const seleccionat = this.projecteActual === p.nom_carpeta ? 'selected' : '';
-            const prioritari = p.prioritari ? '<span class="badge-prioritari">!</span>' : '';
+            const prioritari = p.prioritari
+                ? `<button class="badge-prioritari" onclick="event.stopPropagation();App.togglePrioritat('${this._esc(p.nom_carpeta)}',false)" title="Treure prioritat">!</button>`
+                : `<button class="badge-prioritari-off" onclick="event.stopPropagation();App.togglePrioritat('${this._esc(p.nom_carpeta)}',true)" title="Marcar prioritari">!</button>`;
             const pct = p.percentatge;
             const colorBarra = this._colorPerPercentatge(pct);
             const colorPct = pct >= 100 ? '#10B981' : '#374151';
@@ -393,6 +395,13 @@ const App = {
             const ara = new Date();
             syncEl.textContent = `Sincronitzat: ${ara.toLocaleTimeString('ca-ES', {hour:'2-digit',minute:'2-digit',second:'2-digit'})}`;
         }
+    },
+
+    // --- PRIORITAT ---
+
+    async togglePrioritat(nomProjecte, prioritari) {
+        await API.patch(`/api/projectes/${encodeURIComponent(nomProjecte)}`, { prioritari });
+        await this.carregarProjectes();
     },
 
     // --- ACCIONS ---

@@ -66,11 +66,19 @@ body {
 @media (hover: hover) { .projecte-item:hover { background: #F9FAFB; } }
 .projecte-item.selected { background: #93C5FD; border-color: #93C5FD; }
 .projecte-item-top { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-.badge-prioritari {
+.badge-prioritari, .badge-prioritari-off {
     display: inline-flex; width: 22px; height: 22px; align-items: center; justify-content: center;
-    background: #F59E0B; color: white; border-radius: 50%; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+    border-radius: 50%; font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+    border: none; cursor: pointer; padding: 0;
+}
+.badge-prioritari {
+    background: #F59E0B; color: white;
     animation: pulse-prioritat 2.1s ease-in-out infinite;
 }
+.badge-prioritari-off {
+    background: #E5E7EB; color: #9CA3AF; opacity: 0.5;
+}
+.badge-prioritari-off:hover { opacity: 0.8; }
 @keyframes pulse-prioritat {
     0%, 100% { opacity: 1; }
     16% { opacity: 0.82; }

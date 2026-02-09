@@ -371,9 +371,19 @@ const App = {
     },
 
     async obrirDocument(rutaDocument) {
-        const resp = await API.get(`/api/obrir-document/${encodeURIComponent(rutaDocument)}`);
-        if (resp && resp.url) {
-            window.open(resp.url, '_blank');
+        try {
+            // Normalitzar backslashes i codificar cada segment (NO les barres!)
+            const ruta = rutaDocument.replace(/\\/g, '/');
+            const encodedPath = ruta.split('/').map(s => encodeURIComponent(s)).join('/');
+            const resp = await API.get(`/api/obrir-document/${encodedPath}`);
+            if (resp && resp.url) {
+                window.open(resp.url, '_blank');
+            } else {
+                alert('No s\'ha pogut obtenir el link del document.');
+            }
+        } catch (e) {
+            console.error('Error obrint document:', e);
+            alert('Error obrint el document. Comprova que existeix a OneDrive.');
         }
     },
 

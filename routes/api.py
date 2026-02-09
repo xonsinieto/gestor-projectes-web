@@ -404,16 +404,27 @@ def obtenir_foto_usuari(nom):
 @api_bp.route("/obrir-document/<path:ruta>")
 def obrir_document(ruta):
     """Crea un link de visualitzacio d'OneDrive per obrir un document al navegador."""
+    import logging
+    logger = logging.getLogger(__name__)
+
     token = get_access_token()
     if not token:
         return jsonify({"error": "No autenticat"}), 401
 
+    # Normalitzar backslashes (paths del desktop poden tenir \\)
+    ruta = ruta.replace("\\", "/")
+
     graph = GraphClient(token)
     full_path = f"{config_web.ONEDRIVE_BASE_PATH}/{ruta}"
+    logger.info(f"Obrint document: {full_path}")
+
     link = graph.obtenir_link_compartit(full_path)
     if link:
+        logger.info(f"Link obtingut: {link}")
         return jsonify({"url": link})
-    return jsonify({"error": "No s'ha pogut obtenir el link"}), 404
+
+    logger.warning(f"No s'ha pogut obtenir link per: {full_path}")
+    return jsonify({"error": f"No s'ha trobat: {ruta}"}), 404
 
 
 # --- ONEDRIVE: CARPETES I FITXERS ---

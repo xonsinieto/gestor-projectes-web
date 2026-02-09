@@ -87,15 +87,27 @@ class GraphClient:
     # --- Links compartits ---
 
     def obtenir_link_compartit(self, path: str) -> str:
-        """Crea un link de visualitzacio per a un fitxer.
-        Retorna la URL o cadena buida si falla.
+        """Obte la URL de visualitzacio d'un fitxer a OneDrive.
+        Usa webUrl de les metadades (fiable per comptes personals i business).
+        Si falla, intenta createLink com a fallback.
         """
-        url = f"{self.GRAPH_URL}/me/drive/root:/{path}:/createLink"
+        # Metode 1: webUrl de metadades (sempre funciona)
         try:
+            url = f"{self.GRAPH_URL}/me/drive/root:/{path}"
+            resp = self._get(url, params={"select": "webUrl"})
+            web_url = resp.json().get("webUrl", "")
+            if web_url:
+                return web_url
+        except requests.HTTPError:
+            pass
+
+        # Metode 2: createLink sense scope (comptes personals no suporten scope)
+        try:
+            url = f"{self.GRAPH_URL}/me/drive/root:/{path}:/createLink"
             resp = requests.post(
                 url,
                 headers={**self._headers, "Content-Type": "application/json"},
-                json={"type": "view", "scope": "anonymous"},
+                json={"type": "view"},
                 timeout=15,
             )
             if resp.ok:

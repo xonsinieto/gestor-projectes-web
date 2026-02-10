@@ -168,6 +168,8 @@ const App = {
 
             // Icona carpeta per obrir a OneDrive
             const carpetaBtn = `<button class="btn-carpeta" onclick="event.stopPropagation();App.obrirCarpeta('${this._esc(p.nom_carpeta)}')" title="Obrir carpeta a OneDrive">&#128193;</button>`;
+            // Menu contextual (⋮)
+            const menuBtn = `<button class="btn-menu-projecte" onclick="event.stopPropagation();App.mostrarMenuProjecte(event,'${this._esc(p.nom_carpeta)}',${p.arxivat},${p.prioritari})" title="Opcions">&#8942;</button>`;
 
             return `
                 <div class="projecte-item ${seleccionat}" data-nom="${this._esc(p.nom_carpeta)}"
@@ -175,6 +177,7 @@ const App = {
                     <div class="projecte-item-top">
                         ${prioritari}
                         <span class="projecte-nom">${this._esc(p.codi)} ${this._esc(p.descripcio)}</span>
+                        ${menuBtn}
                     </div>
                     <div class="barra-progres">
                         <div class="barra-progres-fill" style="width:${pct}%;background:${colorBarra}"></div>
@@ -369,10 +372,11 @@ const App = {
         const parts = docPath.split('/');
         parts.pop();
         const carpetaPath = parts.join('/') || nomProjecte;
+        const encodedDoc = docPath.split('/').map(s => encodeURIComponent(s)).join('/');
 
-        return `<button class="btn-document" onclick="App.obrirDocument('${this._esc(t.document)}')" title="${this._esc(t.document)}">
+        return `<a class="btn-document" href="/api/redir-document/${encodedDoc}" target="_blank" title="${this._esc(t.document)}">
                     &#128196; ${this._esc(nomFitxer)}
-                </button>
+                </a>
                 <button class="btn-carpeta-doc" onclick="App.obrirCarpeta('${this._esc(carpetaPath)}')" title="Obrir carpeta del document">
                     &#128194;
                 </button>
@@ -794,7 +798,60 @@ const App = {
         this.carregarProjectes();
     },
 
+    // --- MENU CONTEXTUAL PROJECTE (touch-friendly) ---
+
+    mostrarMenuProjecte(event, nom, arxivat, prioritari) {
+        // Tancar menu anterior si existeix
+        this.tancarMenuProjecte();
+        const menu = document.createElement('div');
+        menu.className = 'menu-projecte';
+        menu.id = 'menu-projecte-popup';
+
+        const opcioArxivar = arxivat
+            ? `<button onclick="App._arxivarProjecte('${this._esc(nom)}',false)">Desarxivar</button>`
+            : `<button onclick="App._arxivarProjecte('${this._esc(nom)}',true)">Arxivar</button>`;
+        const opcioPrioritat = prioritari
+            ? `<button onclick="App._prioritatProjecte('${this._esc(nom)}',false)">Treure prioritat</button>`
+            : `<button onclick="App._prioritatProjecte('${this._esc(nom)}',true)">Marcar prioritari</button>`;
+
+        menu.innerHTML = `
+            ${opcioPrioritat}
+            ${opcioArxivar}
+            <button class="menu-danger" onclick="App.confirmarEliminarProjecte('${this._esc(nom)}')">Eliminar</button>
+        `;
+        document.body.appendChild(menu);
+
+        // Posicionar a prop del botó
+        const rect = event.target.getBoundingClientRect();
+        menu.style.top = `${rect.bottom + 4}px`;
+        menu.style.left = `${Math.min(rect.left, window.innerWidth - 180)}px`;
+
+        // Tancar al fer clic fora
+        setTimeout(() => {
+            document.addEventListener('click', this._tancarMenuHandler = () => this.tancarMenuProjecte(), { once: true });
+        }, 10);
+    },
+
+    tancarMenuProjecte() {
+        const menu = document.getElementById('menu-projecte-popup');
+        if (menu) menu.remove();
+    },
+
+    async _arxivarProjecte(nom, arxivar) {
+        this.tancarMenuProjecte();
+        await API.patch(`/api/projectes/${encodeURIComponent(nom)}`, { arxivat: arxivar });
+        await this.carregarProjectes();
+    },
+
+    async _prioritatProjecte(nom, prioritari) {
+        this.tancarMenuProjecte();
+        await API.patch(`/api/projectes/${encodeURIComponent(nom)}`, { prioritari: prioritari });
+        await this.carregarProjectes();
+        if (this.projecteActual === nom) await this._carregarDetall(nom);
+    },
+
     confirmarEliminarProjecte(nom) {
+        this.tancarMenuProjecte();
         this.mostrarDialog(`
             <div class="dialog-header"><h3>Eliminar projecte</h3></div>
             <div class="dialog-body"><p>Segur que vols eliminar "${this._esc(nom)}"?</p></div>

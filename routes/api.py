@@ -3,7 +3,7 @@ Blueprint API REST — Endpoints JSON per a crides AJAX des del frontend.
 """
 from datetime import datetime
 
-from flask import Blueprint, Response, jsonify, request, session
+from flask import Blueprint, Response, jsonify, redirect, request, session
 
 import config_web
 from models.tasca import Tasca
@@ -435,6 +435,38 @@ def obrir_document(ruta):
             return jsonify({"url": folder_link, "es_carpeta": True})
 
     return jsonify({"error": f"No s'ha trobat: {ruta}"}), 404
+
+
+@api_bp.route("/redir-document/<path:ruta>")
+def redir_document(ruta):
+    """Redirigeix directament a la URL del document a OneDrive (per a <a> links)."""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    token = get_access_token()
+    if not token:
+        return "No autenticat. <a href='/auth/login'>Inicia sessio</a>", 401
+
+    ruta = ruta.replace("\\", "/")
+    graph = GraphClient(token)
+    full_path = f"{config_web.ONEDRIVE_BASE_PATH}/{ruta}"
+    logger.info(f"Redirect document: {full_path}")
+
+    link = graph.obtenir_url_item(full_path)
+    if link:
+        logger.info(f"Redirect OK: {link[:100]}")
+        return redirect(link)
+
+    # Fallback: carpeta pare
+    parts = ruta.rsplit("/", 1)
+    if len(parts) > 1:
+        folder_path = f"{config_web.ONEDRIVE_BASE_PATH}/{parts[0]}"
+        folder_link = graph.obtenir_url_item(folder_path)
+        if folder_link:
+            logger.info(f"Redirect fallback carpeta: {folder_link[:100]}")
+            return redirect(folder_link)
+
+    return f"No s'ha trobat el document: {ruta}", 404
 
 
 @api_bp.route("/obrir-carpeta/<path:nom_projecte>")

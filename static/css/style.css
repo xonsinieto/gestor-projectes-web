@@ -220,7 +220,9 @@ body {
     padding: 0 10px; cursor: pointer; white-space: nowrap;
     max-width: 180px; overflow: hidden; text-overflow: ellipsis;
     display: inline-flex; align-items: center;
+    text-decoration: none;
 }
+a.btn-document:visited { color: #065F46; }
 .btn-document:hover { background: #A7F3D0; }
 .btn-document:active { transform: scale(0.97); }
 .btn-eliminar-doc {
@@ -426,6 +428,28 @@ body {
     .btn-tornar { display: none; }
     .panel-detall.active { display: flex; }
 }
+
+/* === MENU CONTEXTUAL PROJECTE (⋮) === */
+.btn-menu-projecte {
+    background: none; border: none; cursor: pointer;
+    font-size: 1.1rem; color: #9CA3AF; padding: 0 4px;
+    line-height: 1; margin-left: auto; flex-shrink: 0;
+}
+.btn-menu-projecte:hover { color: #374151; }
+.menu-projecte {
+    position: fixed; z-index: 1000;
+    background: #FFFFFF; border: 1px solid #E5E7EB;
+    border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    min-width: 160px; overflow: hidden;
+}
+.menu-projecte button {
+    display: block; width: 100%; padding: 10px 16px;
+    border: none; background: none; text-align: left;
+    font-size: 0.85rem; cursor: pointer; color: #374151;
+}
+.menu-projecte button:hover { background: #F3F4F6; }
+.menu-projecte button.menu-danger { color: #DC2626; }
+.menu-projecte button.menu-danger:hover { background: #FEE2E2; }
 
 /* Touch: botons mes grans per a dits */
 @media (pointer: coarse) {

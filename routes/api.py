@@ -418,16 +418,18 @@ def obrir_document(ruta):
     full_path = f"{config_web.ONEDRIVE_BASE_PATH}/{ruta}"
     logger.info(f"Obrint document: ruta={ruta}, full_path={full_path}")
 
-    # Intentar obtenir URL del fitxer
+    # Intentar obtenir URL del fitxer (amb 3 fallbacks interns)
     link = graph.obtenir_url_item(full_path)
     if link:
+        logger.info(f"Document obert OK: {link[:100]}")
         return jsonify({"url": link})
 
-    # Fallback: intentar obrir la carpeta pare
+    # Ultim recurs: obrir la carpeta pare
+    logger.warning(f"No s'ha pogut obtenir URL del document: {full_path}")
     parts = ruta.rsplit("/", 1)
     if len(parts) > 1:
         folder_path = f"{config_web.ONEDRIVE_BASE_PATH}/{parts[0]}"
-        logger.info(f"Fallback: intentant carpeta pare: {folder_path}")
+        logger.info(f"Ultim recurs: carpeta pare: {folder_path}")
         folder_link = graph.obtenir_url_item(folder_path)
         if folder_link:
             return jsonify({"url": folder_link, "es_carpeta": True})

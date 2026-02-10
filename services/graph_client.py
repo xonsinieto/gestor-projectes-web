@@ -83,7 +83,7 @@ class GraphClient:
         """
         url = f"{self.GRAPH_URL}/me/drive/root:/{path}:/children"
         resp = self._get(url, params={
-            "$select": "name,folder,file,size,lastModifiedDateTime",
+            "$select": "name,folder,file,size,lastModifiedDateTime,webUrl",
             "$top": "200",
         })
         return resp.json().get("value", [])
@@ -98,33 +98,64 @@ class GraphClient:
         """Obte la webUrl d'un fitxer o carpeta a OneDrive.
         Retorna la URL o cadena buida si falla.
         """
-        # Intentar primer amb codificacio manual per segment
-        encoded = self._encode_path(path)
-        url = f"{self.GRAPH_URL}/me/drive/root:/{encoded}"
-        logger.info(f"Graph API GET: {url}")
+        # 1) Acces directe per path (requests auto-codifica)
+        url1 = f"{self.GRAPH_URL}/me/drive/root:/{path}"
+        logger.info(f"Graph API GET (directe): {url1}")
         try:
-            resp = requests.get(url, headers=self._headers, timeout=15)
+            resp = requests.get(url1, headers=self._headers, timeout=15)
             logger.info(f"Graph API response: {resp.status_code}")
             if resp.ok:
                 data = resp.json()
                 web_url = data.get("webUrl", "")
-                logger.info(f"webUrl obtingut: {web_url}")
-                return web_url
+                if web_url:
+                    logger.info(f"webUrl obtingut (directe): {web_url}")
+                    return web_url
             else:
-                logger.warning(f"Graph API error: {resp.status_code} - {resp.text[:200]}")
-                # Fallback: deixar que requests codifiqui automaticament
-                url2 = f"{self.GRAPH_URL}/me/drive/root:/{path}"
-                logger.info(f"Graph API GET (fallback sense encode): {url2}")
+                logger.warning(f"Graph API error (directe): {resp.status_code} - {resp.text[:300]}")
+        except requests.RequestException as e:
+            logger.error(f"Graph API exception (directe): {e}")
+
+        # 2) Acces amb codificacio manual per segment
+        encoded = self._encode_path(path)
+        url2 = f"{self.GRAPH_URL}/me/drive/root:/{encoded}"
+        if url2 != url1:
+            logger.info(f"Graph API GET (encoded): {url2}")
+            try:
                 resp2 = requests.get(url2, headers=self._headers, timeout=15)
                 if resp2.ok:
                     data2 = resp2.json()
                     web_url2 = data2.get("webUrl", "")
-                    logger.info(f"webUrl obtingut (fallback): {web_url2}")
-                    return web_url2
+                    if web_url2:
+                        logger.info(f"webUrl obtingut (encoded): {web_url2}")
+                        return web_url2
                 else:
-                    logger.warning(f"Graph API fallback error: {resp2.status_code}")
-        except requests.RequestException as e:
-            logger.error(f"Graph API exception: {e}")
+                    logger.warning(f"Graph API error (encoded): {resp2.status_code}")
+            except requests.RequestException as e:
+                logger.error(f"Graph API exception (encoded): {e}")
+
+        # 3) Fallback: llistar carpeta pare i buscar el fitxer per nom
+        parts = path.rsplit("/", 1)
+        if len(parts) == 2:
+            parent_path, filename = parts
+            logger.info(f"Fallback: buscant '{filename}' dins '{parent_path}'")
+            try:
+                children_url = f"{self.GRAPH_URL}/me/drive/root:/{parent_path}:/children"
+                resp3 = requests.get(
+                    children_url, headers=self._headers, timeout=15,
+                    params={"$select": "name,webUrl", "$top": "200"},
+                )
+                if resp3.ok:
+                    for item in resp3.json().get("value", []):
+                        if item.get("name", "").lower() == filename.lower():
+                            web_url3 = item.get("webUrl", "")
+                            logger.info(f"webUrl obtingut (per carpeta pare): {web_url3}")
+                            return web_url3
+                    logger.warning(f"Fitxer '{filename}' no trobat dins '{parent_path}'")
+                else:
+                    logger.warning(f"Error llistant carpeta pare: {resp3.status_code}")
+            except requests.RequestException as e:
+                logger.error(f"Exception buscant per carpeta pare: {e}")
+
         return ""
 
     def obtenir_link_compartit(self, path: str) -> str:

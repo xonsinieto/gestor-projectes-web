@@ -210,6 +210,7 @@ class DataManagerWeb:
                     "nom": item["name"],
                     "es_carpeta": es_carpeta,
                     "mida": item.get("size", 0) if not es_carpeta else None,
+                    "webUrl": item.get("webUrl", ""),
                 })
             resultat.sort(key=lambda x: (not x["es_carpeta"], x["nom"].lower()))
             return resultat

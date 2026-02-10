@@ -386,9 +386,12 @@ const App = {
             const resp = await fetch(`/api/obrir-document/${encodedPath}`);
             const data = await resp.json();
             if (data.url) {
+                if (data.es_carpeta) {
+                    console.warn('Document no trobat directament, obrint carpeta pare');
+                }
                 window.open(data.url, '_blank');
-            } else {
-                // Si falla, obrir carpeta pare com a fallback
+            } else if (data.error) {
+                // Fallback JS: obrir carpeta pare
                 const parts = ruta.split('/');
                 parts.pop();
                 const carpeta = parts.join('/');

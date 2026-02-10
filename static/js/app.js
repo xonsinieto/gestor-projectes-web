@@ -381,7 +381,6 @@ const App = {
 
     async obrirDocument(rutaDocument) {
         try {
-            // Normalitzar backslashes i codificar cada segment (NO les barres!)
             const ruta = rutaDocument.replace(/\\/g, '/');
             const encodedPath = ruta.split('/').map(s => encodeURIComponent(s)).join('/');
             const resp = await fetch(`/api/obrir-document/${encodedPath}`);
@@ -389,7 +388,16 @@ const App = {
             if (data.url) {
                 window.open(data.url, '_blank');
             } else {
-                alert(data.error || 'No s\'ha pogut obtenir el link del document.');
+                // Si falla, obrir carpeta pare com a fallback
+                const parts = ruta.split('/');
+                parts.pop();
+                const carpeta = parts.join('/');
+                if (carpeta) {
+                    console.warn(`Document no trobat, obrint carpeta: ${carpeta}`);
+                    this.obrirCarpeta(carpeta);
+                } else {
+                    alert(`No s'ha trobat el document: ${ruta}`);
+                }
             }
         } catch (e) {
             console.error('Error obrint document:', e);

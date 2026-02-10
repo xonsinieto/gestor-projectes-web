@@ -51,7 +51,7 @@ body {
 
 /* === PANEL PROJECTES (ESQUERRE) === */
 .panel-projectes {
-    width: 360px; min-width: 360px; border-right: 1px solid #E5E7EB;
+    width: 280px; min-width: 280px; border-right: 1px solid #E5E7EB;
     display: flex; flex-direction: column; overflow: hidden;
 }
 .panel-header {

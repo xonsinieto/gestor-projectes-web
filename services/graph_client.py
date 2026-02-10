@@ -98,13 +98,12 @@ class GraphClient:
         """Obte la webUrl d'un fitxer o carpeta a OneDrive.
         Retorna la URL o cadena buida si falla.
         """
+        # Intentar primer amb codificacio manual per segment
         encoded = self._encode_path(path)
         url = f"{self.GRAPH_URL}/me/drive/root:/{encoded}"
         logger.info(f"Graph API GET: {url}")
         try:
-            resp = requests.get(
-                url, headers=self._headers, timeout=15,
-            )
+            resp = requests.get(url, headers=self._headers, timeout=15)
             logger.info(f"Graph API response: {resp.status_code}")
             if resp.ok:
                 data = resp.json()
@@ -113,6 +112,17 @@ class GraphClient:
                 return web_url
             else:
                 logger.warning(f"Graph API error: {resp.status_code} - {resp.text[:200]}")
+                # Fallback: deixar que requests codifiqui automaticament
+                url2 = f"{self.GRAPH_URL}/me/drive/root:/{path}"
+                logger.info(f"Graph API GET (fallback sense encode): {url2}")
+                resp2 = requests.get(url2, headers=self._headers, timeout=15)
+                if resp2.ok:
+                    data2 = resp2.json()
+                    web_url2 = data2.get("webUrl", "")
+                    logger.info(f"webUrl obtingut (fallback): {web_url2}")
+                    return web_url2
+                else:
+                    logger.warning(f"Graph API fallback error: {resp2.status_code}")
         except requests.RequestException as e:
             logger.error(f"Graph API exception: {e}")
         return ""

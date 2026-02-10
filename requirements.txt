@@ -1,5 +1,5 @@
 Flask>=3.0
-Flask-Session>=0.5,<0.8
+Flask-Session>=0.8
 msal>=1.28
 requests>=2.31
 gunicorn>=22.0

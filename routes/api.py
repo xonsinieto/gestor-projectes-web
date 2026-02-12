@@ -281,6 +281,11 @@ def actualitzar_tasca(nom, nom_tasca):
         tasca.data_modificacio = datetime.now().isoformat(timespec="seconds")
 
     if "document" in data:
+        # Moure document antic a historial si n'hi ha un de diferent
+        if tasca.document and tasca.document != data["document"]:
+            if not hasattr(tasca, 'documents_historial'):
+                tasca.documents_historial = []
+            tasca.documents_historial.append(tasca.document)
         tasca.document = data["document"]
         tasca.data_modificacio = datetime.now().isoformat(timespec="seconds")
 

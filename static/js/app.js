@@ -366,21 +366,93 @@ const App = {
     },
 
     _renderDocumentInline(t, nomProjecte) {
-        // Dos pills junts: verd (document) + gris (carpeta)
+        // Dos pills junts: verd (document) + gris (carpeta) + historial
         const nomFitxer = t.document.split('/').pop().split('\\').pop();
+        const nomMostrat = nomFitxer.length > 30 ? nomFitxer.substring(0, 27) + '...' : nomFitxer;
         const docPath = t.document.replace(/\\/g, '/');
         const parts = docPath.split('/');
         parts.pop();
         const carpetaPath = parts.join('/') || nomProjecte;
         const encodedDoc = docPath.split('/').map(s => encodeURIComponent(s)).join('/');
+        const historial = t.documents_historial || [];
 
-        return `<a class="btn-document" href="/api/redir-document/${encodedDoc}" target="_blank" title="${this._esc(t.document)}">
-                    &#128196; ${this._esc(nomFitxer)}
+        let histDocHTML = '';
+        if (historial.length) {
+            histDocHTML = `<button class="btn-hist-doc" onclick="App.toggleHistorial(this,'docs','${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Historial documents">···</button>`;
+        }
+
+        // Carpetes historial (diferents de l'actual)
+        const carpetaActual = carpetaPath;
+        const carpetesHist = [];
+        for (let i = historial.length - 1; i >= 0; i--) {
+            const c = historial[i].replace(/\\/g, '/').split('/').slice(0, -1).join('/');
+            if (c && c !== carpetaActual && !carpetesHist.includes(c)) carpetesHist.push(c);
+        }
+        let histCarpHTML = '';
+        if (carpetesHist.length) {
+            histCarpHTML = `<button class="btn-hist-carpeta" onclick="App.toggleHistorial(this,'carpetes','${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Historial carpetes">···</button>`;
+        }
+
+        return `${histDocHTML}
+                <a class="btn-document" href="/api/redir-document/${encodedDoc}" target="_blank" title="${this._esc(t.document)}">
+                    &#128196; ${this._esc(nomMostrat)}
                 </a>
+                ${histCarpHTML}
                 <button class="btn-carpeta-doc" onclick="App.obrirCarpeta('${this._esc(carpetaPath)}')" title="Obrir carpeta del document">
                     &#128194;
                 </button>
                 <button class="btn-eliminar-doc" onclick="App.eliminarDocument('${this._esc(nomProjecte)}','${this._esc(t.nom)}')" title="Desvincular">&times;</button>`;
+    },
+
+    toggleHistorial(btn, tipus, nomProjecte, nomTasca) {
+        // Tancar qualsevol historial obert
+        document.querySelectorAll('.historial-popup').forEach(el => el.remove());
+
+        const proj = this._projectesData.find(p => p.nom_carpeta === nomProjecte);
+        if (!proj) return;
+        const tasca = proj.tasques.find(t => t.nom === nomTasca);
+        if (!tasca) return;
+        const historial = tasca.documents_historial || [];
+        if (!historial.length) return;
+
+        const popup = document.createElement('div');
+        popup.className = 'historial-popup';
+
+        if (tipus === 'docs') {
+            const total = historial.length;
+            for (let i = historial.length - 1; i >= 0; i--) {
+                const doc = historial[i];
+                const nom = doc.split('/').pop().split('\\').pop();
+                const num = i + 1;
+                const encoded = doc.replace(/\\/g, '/').split('/').map(s => encodeURIComponent(s)).join('/');
+                popup.innerHTML += `<a class="historial-item" href="/api/redir-document/${encoded}" target="_blank">${num}. 📄 ${this._esc(nom)}</a>`;
+            }
+        } else {
+            const carpetaActual = tasca.document.replace(/\\/g, '/').split('/').slice(0, -1).join('/');
+            const carpetes = [];
+            for (let i = historial.length - 1; i >= 0; i--) {
+                const c = historial[i].replace(/\\/g, '/').split('/').slice(0, -1).join('/');
+                if (c && c !== carpetaActual && !carpetes.includes(c)) carpetes.push(c);
+            }
+            carpetes.forEach((c, idx) => {
+                const nom = c.split('/').pop();
+                const num = carpetes.length - idx;
+                popup.innerHTML += `<a class="historial-item" href="#" onclick="event.preventDefault();App.obrirCarpeta('${this._esc(c)}')">${num}. 📂 ${this._esc(nom)}</a>`;
+            });
+        }
+
+        btn.parentElement.style.position = 'relative';
+        btn.parentElement.appendChild(popup);
+
+        // Tancar al clicar fora
+        setTimeout(() => {
+            document.addEventListener('click', function _close(e) {
+                if (!popup.contains(e.target) && e.target !== btn) {
+                    popup.remove();
+                    document.removeEventListener('click', _close);
+                }
+            });
+        }, 10);
     },
 
     async obrirDocument(rutaDocument) {
@@ -522,10 +594,20 @@ const App = {
 
         const proj = await API.get(`/api/projectes/${encodeURIComponent(nomProjecte)}`);
         const tasca = proj.tasques.find(t => t.nom === nomTasca);
-        const obsActual = tasca ? tasca.observacions : '';
-        const novaObs = obsActual
-            ? `${obsActual}\n${CONFIG.usuariActual}:\n${text}`
-            : `${CONFIG.usuariActual}:\n${text}`;
+        const obsActual = tasca ? (tasca.observacions || '') : '';
+        let novaObs;
+        if (!obsActual.trim()) {
+            novaObs = `${CONFIG.usuariActual}:\n${text}`;
+        } else {
+            // Trobar l'últim autor
+            const autors = [...obsActual.matchAll(/^@?([^:\n]+):$/gm)];
+            const ultimAutor = autors.length ? autors[autors.length-1][1].trim() : '';
+            if (ultimAutor === CONFIG.usuariActual) {
+                novaObs = `${obsActual}\n${text}`;
+            } else {
+                novaObs = `${obsActual}\n\n${CONFIG.usuariActual}:\n${text}`;
+            }
+        }
 
         await API.patch(
             `/api/projectes/${encodeURIComponent(nomProjecte)}/tasques/${encodeURIComponent(nomTasca)}`,

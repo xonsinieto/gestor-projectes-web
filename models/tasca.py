@@ -14,12 +14,13 @@ class Tasca:
     assignat: str = ""
     observacions: str = ""
     document: str = ""
+    documents_historial: list[str] = field(default_factory=list)
     data_modificacio: str = field(
         default_factory=lambda: datetime.now().isoformat(timespec="seconds")
     )
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "nom": self.nom,
             "estat": self.estat,
             "assignat": self.assignat,
@@ -27,6 +28,9 @@ class Tasca:
             "document": self.document,
             "data_modificacio": self.data_modificacio,
         }
+        if self.documents_historial:
+            d["documents_historial"] = self.documents_historial
+        return d
 
     @classmethod
     def from_dict(cls, data: dict) -> "Tasca":
@@ -36,6 +40,7 @@ class Tasca:
             assignat=data.get("assignat", ""),
             observacions=data.get("observacions", ""),
             document=data.get("document", ""),
+            documents_historial=data.get("documents_historial", []),
             data_modificacio=data.get(
                 "data_modificacio",
                 datetime.now().isoformat(timespec="seconds"),

@@ -443,10 +443,12 @@ const App = {
 
     _formatObs(text) {
         return text.split('\n').filter(l => l.trim()).map(l => {
-            if (l.startsWith('@')) {
-                return `<div class="obs-line obs-author">${this._esc(l)}</div>`;
+            // Treure @ dels noms antics i detectar línies d'usuari (amb o sense @)
+            const clean = l.startsWith('@') ? l.substring(1) : l;
+            if (/^[^:]+:$/.test(clean.trim())) {
+                return `<div class="obs-line obs-author">${this._esc(clean)}</div>`;
             }
-            return `<div class="obs-line">${this._esc(l)}</div>`;
+            return `<div class="obs-line">${this._esc(clean)}</div>`;
         }).join('');
     },
 
@@ -522,8 +524,8 @@ const App = {
         const tasca = proj.tasques.find(t => t.nom === nomTasca);
         const obsActual = tasca ? tasca.observacions : '';
         const novaObs = obsActual
-            ? `${obsActual}\n@${CONFIG.usuariActual}:\n${text}`
-            : `@${CONFIG.usuariActual}:\n${text}`;
+            ? `${obsActual}\n${CONFIG.usuariActual}:\n${text}`
+            : `${CONFIG.usuariActual}:\n${text}`;
 
         await API.patch(
             `/api/projectes/${encodeURIComponent(nomProjecte)}/tasques/${encodeURIComponent(nomTasca)}`,

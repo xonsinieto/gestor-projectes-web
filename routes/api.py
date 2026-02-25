@@ -445,8 +445,8 @@ def obrir_document(ruta):
 @api_bp.route("/redir-document/<path:ruta>")
 def redir_document(ruta):
     """Obre document/carpeta a OneDrive.
-    - Carpetes: redirect directe a webUrl.
-    - Fitxers: descarrega directa (Android ofereix 'obrir amb' app).
+    - Carpetes: redirect directe a webUrl (ja funciona a tablets).
+    - Fitxers: URL transformada al format de carpeta (cid+id) que l'app OneDrive accepta.
     """
     import logging
     logger = logging.getLogger(__name__)
@@ -478,14 +478,18 @@ def redir_document(ruta):
         logger.info(f"Carpeta - redirect directe: {info['webUrl']}")
         return redirect(info["webUrl"])
 
-    # Fitxers: redirect a URL de descarrega directa
-    # Android descarrega el fitxer i ofereix "obrir amb" (OneDrive, Word, etc.)
-    download_url = info.get("downloadUrl", "")
-    if download_url:
-        logger.info(f"Fitxer - descarrega directa: {info['name']}")
-        return redirect(download_url)
+    # Fitxers: transformar URL al format que l'app OneDrive accepta
+    # Les carpetes usen: onedrive.live.com/?cid=X&id=X!Y (funciona amb l'app)
+    # Els fitxers usen: onedrive.live.com/edit.aspx?resid=X!Y (l'app ho rebutja)
+    # Solucio: construir la URL del fitxer amb el format de carpeta
+    item_id = info.get("id", "")
+    if item_id and "!" in item_id:
+        cid = item_id.split("!")[0]
+        transformed_url = f"https://onedrive.live.com/?cid={cid}&id={item_id}"
+        logger.info(f"Fitxer - URL transformada: {transformed_url}")
+        return redirect(transformed_url)
 
-    # Fallback: webUrl (s'obre al navegador)
+    # Fallback: webUrl directe
     if info["webUrl"]:
         logger.info(f"Fitxer - fallback webUrl: {info['webUrl']}")
         return redirect(info["webUrl"])

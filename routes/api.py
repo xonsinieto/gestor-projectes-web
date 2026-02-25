@@ -446,9 +446,10 @@ def obrir_document(ruta):
 def redir_document(ruta):
     """Obre document/carpeta a OneDrive.
     - Carpetes: redirect directe a webUrl (ja funciona be a tablets).
-    - Fitxers: crea sharing link (1drv.ms) que l'app mobil gestiona perfectament.
+    - Fitxers: pagina intermedia amb intent URL Android per obrir amb app OneDrive.
     """
     import logging
+    from urllib.parse import quote, urlparse
     logger = logging.getLogger(__name__)
 
     token = get_access_token()
@@ -478,18 +479,67 @@ def redir_document(ruta):
         logger.info(f"Carpeta - redirect directe: {info['webUrl']}")
         return redirect(info["webUrl"])
 
-    # Fitxers: crear sharing link (1drv.ms) per compatibilitat amb app mobil
+    # Fitxers: obtenir sharing link o webUrl
     sharing_link = graph.crear_link_compartit(info["id"])
-    if sharing_link:
-        logger.info(f"Fitxer - sharing link: {sharing_link}")
-        return redirect(sharing_link)
+    target_url = sharing_link or info.get("webUrl", "")
 
-    # Fallback: webUrl directe
-    if info["webUrl"]:
-        logger.info(f"Fitxer - fallback webUrl: {info['webUrl']}")
-        return redirect(info["webUrl"])
+    if not target_url:
+        return f"No s'ha pogut obtenir URL per: {ruta}", 404
 
-    return f"No s'ha pogut obtenir URL per: {ruta}", 404
+    logger.info(f"Fitxer - target URL: {target_url}")
+
+    # Construir intent URL per Android (forca obertura amb app OneDrive)
+    parsed = urlparse(target_url)
+    intent_path = parsed.netloc + parsed.path
+    if parsed.query:
+        intent_path += "?" + parsed.query
+    encoded_fallback = quote(target_url, safe='')
+    intent_url = (
+        f"intent://{intent_path}#Intent;"
+        f"scheme=https;"
+        f"package=com.microsoft.skydrive;"
+        f"S.browser_fallback_url={encoded_fallback};"
+        f"end"
+    )
+
+    # Pagina HTML que intenta obrir amb l'app OneDrive via intent
+    return f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Obrint document...</title>
+<style>
+body {{ font-family: 'Segoe UI', sans-serif; text-align: center; padding: 40px 20px;
+       background: #F9FAFB; color: #374151; }}
+.btn {{ display: inline-block; padding: 14px 28px; margin: 10px; border-radius: 10px;
+       text-decoration: none; font-size: 16px; font-weight: 600; }}
+.btn-app {{ background: #0078D4; color: white; }}
+.btn-web {{ background: #E5E7EB; color: #374151; margin-top: 4px; font-size: 14px;
+           padding: 10px 20px; }}
+.spinner {{ margin: 20px auto; width: 32px; height: 32px; border: 3px solid #E5E7EB;
+           border-top: 3px solid #0078D4; border-radius: 50%;
+           animation: spin 0.8s linear infinite; }}
+@keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+</style>
+</head><body>
+<div class="spinner" id="spinner"></div>
+<p id="msg">Obrint amb OneDrive...</p>
+<div id="botons" style="display:none">
+  <a class="btn btn-app" href="{intent_url}">Obrir amb app OneDrive</a><br>
+  <a class="btn btn-web" href="{target_url}">Obrir al navegador</a>
+</div>
+<script>
+// Intent URL per forcar obertura amb app OneDrive
+var intentUrl = "{intent_url}";
+window.location.href = intentUrl;
+// Si l'app no s'obre en 2s, mostrar botons manuals
+setTimeout(function() {{
+  document.getElementById('spinner').style.display = 'none';
+  document.getElementById('msg').textContent = 'Tria com vols obrir-ho:';
+  document.getElementById('botons').style.display = 'block';
+}}, 2000);
+</script>
+</body></html>"""
 
 
 @api_bp.route("/obrir-carpeta/<path:nom_projecte>")

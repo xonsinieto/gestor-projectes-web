@@ -444,8 +444,9 @@ def obrir_document(ruta):
 
 @api_bp.route("/redir-document/<path:ruta>")
 def redir_document(ruta):
-    """Redirigeix directament a la URL del document a OneDrive (per a <a> links)."""
+    """Obre document/carpeta a OneDrive — intenta app mòbil, fallback navegador."""
     import logging
+    from urllib.parse import quote
     logger = logging.getLogger(__name__)
 
     token = get_access_token()
@@ -458,18 +459,59 @@ def redir_document(ruta):
     logger.info(f"Redirect document: {full_path}")
 
     link = graph.obtenir_url_item(full_path)
-    if link:
-        logger.info(f"Redirect OK: {link[:100]}")
-        return redirect(link)
+    if not link:
+        # Fallback: carpeta pare
+        parts = ruta.rsplit("/", 1)
+        if len(parts) > 1:
+            folder_path = f"{config_web.ONEDRIVE_BASE_PATH}/{parts[0]}"
+            link = graph.obtenir_url_item(folder_path)
 
-    # Fallback: carpeta pare
-    parts = ruta.rsplit("/", 1)
-    if len(parts) > 1:
-        folder_path = f"{config_web.ONEDRIVE_BASE_PATH}/{parts[0]}"
-        folder_link = graph.obtenir_url_item(folder_path)
-        if folder_link:
-            logger.info(f"Redirect fallback carpeta: {folder_link[:100]}")
-            return redirect(folder_link)
+    if not link:
+        return f"No s'ha trobat el document: {ruta}", 404
+
+    logger.info(f"Redirect OK: {link[:100]}")
+
+    # Retornar pàgina HTML que intenta obrir l'app OneDrive (Android)
+    encoded_link = quote(link, safe='')
+    intent_url = f"intent://view#Intent;scheme=https;action=android.intent.action.VIEW;S.browser_fallback_url={encoded_link};end"
+
+    return f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Obrint document...</title>
+<style>
+body {{ font-family: 'Segoe UI', sans-serif; text-align: center; padding: 40px 20px;
+       background: #F9FAFB; color: #374151; }}
+.btn {{ display: inline-block; padding: 12px 24px; margin: 8px; border-radius: 8px;
+       text-decoration: none; font-size: 15px; font-weight: 500; }}
+.btn-app {{ background: #2563EB; color: white; }}
+.btn-web {{ background: #E5E7EB; color: #374151; }}
+.spinner {{ margin: 20px auto; width: 30px; height: 30px; border: 3px solid #E5E7EB;
+           border-top: 3px solid #2563EB; border-radius: 50%;
+           animation: spin 0.8s linear infinite; }}
+@keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+</style>
+</head><body>
+<div class="spinner" id="spinner"></div>
+<p id="msg">Obrint a OneDrive...</p>
+<div id="botons" style="display:none">
+  <p>Com vols obrir-ho?</p>
+  <a class="btn btn-app" href="{link}" id="link-app">Obrir a OneDrive</a><br>
+  <a class="btn btn-web" href="{link}" target="_blank" id="link-web">Obrir al navegador</a>
+</div>
+<script>
+// Intentar obrir directament amb window.location
+// Si l'app OneDrive intercepta la URL, la pàgina es tancarà
+// Si no, mostrar botons manuals després de 2s
+setTimeout(function() {{
+  document.getElementById('spinner').style.display = 'none';
+  document.getElementById('msg').style.display = 'none';
+  document.getElementById('botons').style.display = 'block';
+}}, 1500);
+window.location.href = '{link}';
+</script>
+</body></html>"""
 
     return f"No s'ha trobat el document: {ruta}", 404
 

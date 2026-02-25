@@ -158,6 +158,93 @@ class GraphClient:
 
         return ""
 
+    def obtenir_info_item(self, path: str) -> dict | None:
+        """Obte metadades d'un element (id, webUrl, nom, si es carpeta).
+        Retorna dict o None si no es troba.
+        """
+        url = f"{self.GRAPH_URL}/me/drive/root:/{path}"
+        try:
+            resp = requests.get(url, headers=self._headers, timeout=15,
+                                params={"select": "id,webUrl,name,folder"})
+            if resp.ok:
+                data = resp.json()
+                return {
+                    "id": data.get("id", ""),
+                    "webUrl": data.get("webUrl", ""),
+                    "name": data.get("name", ""),
+                    "is_folder": "folder" in data,
+                }
+        except requests.RequestException:
+            pass
+
+        # Fallback amb codificacio manual
+        encoded = self._encode_path(path)
+        url2 = f"{self.GRAPH_URL}/me/drive/root:/{encoded}"
+        if url2 != url:
+            try:
+                resp2 = requests.get(url2, headers=self._headers, timeout=15,
+                                     params={"select": "id,webUrl,name,folder"})
+                if resp2.ok:
+                    data2 = resp2.json()
+                    return {
+                        "id": data2.get("id", ""),
+                        "webUrl": data2.get("webUrl", ""),
+                        "name": data2.get("name", ""),
+                        "is_folder": "folder" in data2,
+                    }
+            except requests.RequestException:
+                pass
+
+        # Fallback: buscar per nom dins la carpeta pare
+        parts = path.rsplit("/", 1)
+        if len(parts) == 2:
+            parent_path, filename = parts
+            try:
+                children_url = f"{self.GRAPH_URL}/me/drive/root:/{parent_path}:/children"
+                resp3 = requests.get(
+                    children_url, headers=self._headers, timeout=15,
+                    params={"$select": "id,name,webUrl,folder", "$top": "200"},
+                )
+                if resp3.ok:
+                    for item in resp3.json().get("value", []):
+                        if item.get("name", "").lower() == filename.lower():
+                            return {
+                                "id": item.get("id", ""),
+                                "webUrl": item.get("webUrl", ""),
+                                "name": item.get("name", ""),
+                                "is_folder": "folder" in item,
+                            }
+            except requests.RequestException:
+                pass
+
+        return None
+
+    def crear_link_compartit(self, item_id: str) -> str:
+        """Crea un sharing link (1drv.ms) per a un element d'OneDrive.
+        L'app mobil gestiona perfectament aquests links curts.
+        Si ja existeix un link del mateix tipus, retorna l'existent.
+        """
+        url = f"{self.GRAPH_URL}/me/drive/items/{item_id}/createLink"
+        try:
+            resp = requests.post(url, headers={
+                **self._headers,
+                "Content-Type": "application/json",
+            }, json={
+                "type": "view",
+                "scope": "anonymous",
+            }, timeout=15)
+            if resp.ok:
+                data = resp.json()
+                link = data.get("link", {}).get("webUrl", "")
+                if link:
+                    logger.info(f"Sharing link creat/obtingut: {link}")
+                    return link
+            else:
+                logger.warning(f"createLink error: {resp.status_code} - {resp.text[:300]}")
+        except requests.RequestException as e:
+            logger.error(f"createLink exception: {e}")
+        return ""
+
     def obtenir_link_compartit(self, path: str) -> str:
         """Obte la URL de visualitzacio d'un fitxer a OneDrive."""
         return self.obtenir_url_item(path)

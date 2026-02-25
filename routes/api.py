@@ -445,11 +445,10 @@ def obrir_document(ruta):
 @api_bp.route("/redir-document/<path:ruta>")
 def redir_document(ruta):
     """Obre document/carpeta a OneDrive.
-    - Carpetes: redirect directe a webUrl (ja funciona be a tablets).
-    - Fitxers: pagina intermedia amb intent URL Android per obrir amb app OneDrive.
+    - Carpetes: redirect directe a webUrl.
+    - Fitxers: descarrega directa (Android ofereix 'obrir amb' app).
     """
     import logging
-    from urllib.parse import quote, urlparse
     logger = logging.getLogger(__name__)
 
     token = get_access_token()
@@ -461,7 +460,7 @@ def redir_document(ruta):
     full_path = f"{config_web.ONEDRIVE_BASE_PATH}/{ruta}"
     logger.info(f"Redirect document: {full_path}")
 
-    # Obtenir info de l'element (id, webUrl, si es carpeta)
+    # Obtenir info de l'element (id, webUrl, si es carpeta, downloadUrl)
     info = graph.obtenir_info_item(full_path)
 
     if not info:
@@ -479,67 +478,19 @@ def redir_document(ruta):
         logger.info(f"Carpeta - redirect directe: {info['webUrl']}")
         return redirect(info["webUrl"])
 
-    # Fitxers: obtenir sharing link o webUrl
-    sharing_link = graph.crear_link_compartit(info["id"])
-    target_url = sharing_link or info.get("webUrl", "")
+    # Fitxers: redirect a URL de descarrega directa
+    # Android descarrega el fitxer i ofereix "obrir amb" (OneDrive, Word, etc.)
+    download_url = info.get("downloadUrl", "")
+    if download_url:
+        logger.info(f"Fitxer - descarrega directa: {info['name']}")
+        return redirect(download_url)
 
-    if not target_url:
-        return f"No s'ha pogut obtenir URL per: {ruta}", 404
+    # Fallback: webUrl (s'obre al navegador)
+    if info["webUrl"]:
+        logger.info(f"Fitxer - fallback webUrl: {info['webUrl']}")
+        return redirect(info["webUrl"])
 
-    logger.info(f"Fitxer - target URL: {target_url}")
-
-    # Construir intent URL per Android (forca obertura amb app OneDrive)
-    parsed = urlparse(target_url)
-    intent_path = parsed.netloc + parsed.path
-    if parsed.query:
-        intent_path += "?" + parsed.query
-    encoded_fallback = quote(target_url, safe='')
-    intent_url = (
-        f"intent://{intent_path}#Intent;"
-        f"scheme=https;"
-        f"package=com.microsoft.skydrive;"
-        f"S.browser_fallback_url={encoded_fallback};"
-        f"end"
-    )
-
-    # Pagina HTML que intenta obrir amb l'app OneDrive via intent
-    return f"""<!DOCTYPE html>
-<html><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Obrint document...</title>
-<style>
-body {{ font-family: 'Segoe UI', sans-serif; text-align: center; padding: 40px 20px;
-       background: #F9FAFB; color: #374151; }}
-.btn {{ display: inline-block; padding: 14px 28px; margin: 10px; border-radius: 10px;
-       text-decoration: none; font-size: 16px; font-weight: 600; }}
-.btn-app {{ background: #0078D4; color: white; }}
-.btn-web {{ background: #E5E7EB; color: #374151; margin-top: 4px; font-size: 14px;
-           padding: 10px 20px; }}
-.spinner {{ margin: 20px auto; width: 32px; height: 32px; border: 3px solid #E5E7EB;
-           border-top: 3px solid #0078D4; border-radius: 50%;
-           animation: spin 0.8s linear infinite; }}
-@keyframes spin {{ to {{ transform: rotate(360deg); }} }}
-</style>
-</head><body>
-<div class="spinner" id="spinner"></div>
-<p id="msg">Obrint amb OneDrive...</p>
-<div id="botons" style="display:none">
-  <a class="btn btn-app" href="{intent_url}">Obrir amb app OneDrive</a><br>
-  <a class="btn btn-web" href="{target_url}">Obrir al navegador</a>
-</div>
-<script>
-// Intent URL per forcar obertura amb app OneDrive
-var intentUrl = "{intent_url}";
-window.location.href = intentUrl;
-// Si l'app no s'obre en 2s, mostrar botons manuals
-setTimeout(function() {{
-  document.getElementById('spinner').style.display = 'none';
-  document.getElementById('msg').textContent = 'Tria com vols obrir-ho:';
-  document.getElementById('botons').style.display = 'block';
-}}, 2000);
-</script>
-</body></html>"""
+    return f"No s'ha pogut obtenir URL per: {ruta}", 404
 
 
 @api_bp.route("/obrir-carpeta/<path:nom_projecte>")

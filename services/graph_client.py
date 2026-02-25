@@ -158,22 +158,27 @@ class GraphClient:
 
         return ""
 
+    def _parse_item_info(self, data: dict) -> dict:
+        """Extreu info rellevant d'un item de Graph API."""
+        return {
+            "id": data.get("id", ""),
+            "webUrl": data.get("webUrl", ""),
+            "name": data.get("name", ""),
+            "is_folder": "folder" in data,
+            "downloadUrl": data.get("@microsoft.graph.downloadUrl", ""),
+        }
+
     def obtenir_info_item(self, path: str) -> dict | None:
-        """Obte metadades d'un element (id, webUrl, nom, si es carpeta).
+        """Obte metadades d'un element (id, webUrl, nom, si es carpeta, downloadUrl).
         Retorna dict o None si no es troba.
         """
+        select = "id,webUrl,name,folder,@microsoft.graph.downloadUrl"
         url = f"{self.GRAPH_URL}/me/drive/root:/{path}"
         try:
             resp = requests.get(url, headers=self._headers, timeout=15,
-                                params={"select": "id,webUrl,name,folder"})
+                                params={"select": select})
             if resp.ok:
-                data = resp.json()
-                return {
-                    "id": data.get("id", ""),
-                    "webUrl": data.get("webUrl", ""),
-                    "name": data.get("name", ""),
-                    "is_folder": "folder" in data,
-                }
+                return self._parse_item_info(resp.json())
         except requests.RequestException:
             pass
 
@@ -183,15 +188,9 @@ class GraphClient:
         if url2 != url:
             try:
                 resp2 = requests.get(url2, headers=self._headers, timeout=15,
-                                     params={"select": "id,webUrl,name,folder"})
+                                     params={"select": select})
                 if resp2.ok:
-                    data2 = resp2.json()
-                    return {
-                        "id": data2.get("id", ""),
-                        "webUrl": data2.get("webUrl", ""),
-                        "name": data2.get("name", ""),
-                        "is_folder": "folder" in data2,
-                    }
+                    return self._parse_item_info(resp2.json())
             except requests.RequestException:
                 pass
 
@@ -208,12 +207,7 @@ class GraphClient:
                 if resp3.ok:
                     for item in resp3.json().get("value", []):
                         if item.get("name", "").lower() == filename.lower():
-                            return {
-                                "id": item.get("id", ""),
-                                "webUrl": item.get("webUrl", ""),
-                                "name": item.get("name", ""),
-                                "is_folder": "folder" in item,
-                            }
+                            return self._parse_item_info(item)
             except requests.RequestException:
                 pass
 

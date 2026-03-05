@@ -478,23 +478,62 @@ def redir_document(ruta):
         logger.info(f"Carpeta - redirect directe: {info['webUrl']}")
         return redirect(info["webUrl"])
 
-    # Fitxers: transformar URL al format que l'app OneDrive accepta
-    # Les carpetes usen: onedrive.live.com/?cid=X&id=X!Y (funciona amb l'app)
-    # Els fitxers usen: onedrive.live.com/edit.aspx?resid=X!Y (l'app ho rebutja)
-    # Solucio: construir la URL del fitxer amb el format de carpeta
+    # Fitxers: pagina intermedia amb opcions
     item_id = info.get("id", "")
-    if item_id and "!" in item_id:
-        cid = item_id.split("!")[0]
-        transformed_url = f"https://onedrive.live.com/?cid={cid}&id={item_id}"
-        logger.info(f"Fitxer - URL transformada: {transformed_url}")
-        return redirect(transformed_url)
+    filename = info.get("name", ruta.rsplit("/", 1)[-1])
+    cid = item_id.split("!")[0] if item_id and "!" in item_id else ""
+    web_url = info.get("webUrl", "")
 
-    # Fallback: webUrl directe
-    if info["webUrl"]:
-        logger.info(f"Fitxer - fallback webUrl: {info['webUrl']}")
-        return redirect(info["webUrl"])
+    # URL format "redir" (diferent de edit.aspx, pot funcionar amb l'app)
+    redir_url = f"https://onedrive.live.com/redir?resid={item_id}&cid={cid}" if cid else web_url
 
-    return f"No s'ha pogut obtenir URL per: {ruta}", 404
+    # Carpeta pare (garantit que funciona amb l'app OneDrive)
+    parent_folder_url = ""
+    parent_parts = ruta.rsplit("/", 1)
+    if len(parent_parts) > 1:
+        parent_path = f"{config_web.ONEDRIVE_BASE_PATH}/{parent_parts[0]}"
+        parent_info = graph.obtenir_info_item(parent_path)
+        if parent_info:
+            parent_folder_url = parent_info.get("webUrl", "")
+
+    logger.info(f"Fitxer - redir: {redir_url}, carpeta: {parent_folder_url}")
+
+    # Bloc HTML per la carpeta pare (si existeix)
+    folder_html = ""
+    if parent_folder_url:
+        folder_html = (
+            '<p class="divider">Si no s\'obre a l\'app:</p>'
+            f'<a class="btn btn-folder" href="{parent_folder_url}">'
+            '\U0001f4c2 Obrir carpeta a OneDrive</a>'
+        )
+
+    return f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Obrint document...</title>
+<style>
+body {{ font-family: 'Segoe UI', sans-serif; text-align: center; padding: 30px 16px;
+       background: #F9FAFB; color: #374151; }}
+.filename {{ background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 8px;
+            padding: 10px 16px; margin: 16px auto; max-width: 320px;
+            font-size: 14px; color: #1E40AF; word-break: break-all; }}
+.btn {{ display: block; width: 280px; margin: 10px auto; padding: 14px 20px;
+       border-radius: 10px; text-decoration: none; font-size: 15px;
+       font-weight: 600; text-align: center; }}
+.btn-primary {{ background: #0078D4; color: white; }}
+.btn-folder {{ background: #10B981; color: white; }}
+.btn-web {{ background: #E5E7EB; color: #374151; font-weight: 400; font-size: 13px; }}
+.divider {{ color: #9CA3AF; font-size: 12px; margin: 16px 0 8px; }}
+</style>
+</head><body>
+<p style="font-size:15px; margin-bottom:4px;">\U0001f4c4 Document:</p>
+<div class="filename"><strong>{filename}</strong></div>
+<a class="btn btn-primary" href="{redir_url}">Obrir document</a>
+{folder_html}
+<p class="divider">o be:</p>
+<a class="btn btn-web" href="{web_url or redir_url}" target="_blank">Obrir al navegador</a>
+</body></html>"""
 
 
 @api_bp.route("/obrir-carpeta/<path:nom_projecte>")

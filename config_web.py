@@ -150,5 +150,6 @@ DOCUMENTS = {
         "900D Model de Representacio (Cadastre)",
         "Instancia Primera Ocupacio",
         "Entrega Final Ajuntament",
+        "Llibre de l'Edifici",
     ],
 }

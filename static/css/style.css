@@ -422,16 +422,32 @@ a.btn-document:visited { color: #065F46; }
    RESPONSIVE: TABLET VERTICAL (< 768px)
    ================================================================== */
 @media (max-width: 767px) {
-    /* === BARRA SUPERIOR: compacta per mobil === */
-    .top-bar { padding: 6px 10px; gap: 4px; flex-wrap: wrap; min-height: auto; }
-    .app-title { font-size: 0.8rem; }
-    .top-bar-center { order: 3; width: 100%; gap: 6px; }
+    /* === BARRA SUPERIOR: 2 files per mobil === */
+    .top-bar {
+        padding: 0; gap: 0; flex-wrap: wrap; min-height: auto;
+        flex-direction: column; align-items: stretch;
+    }
+    /* Fila 1: titol amb fons gris subtil */
+    .top-bar-left {
+        width: 100%; padding: 10px 14px;
+        background: #F3F4F6; border-bottom: 1px solid #E5E7EB;
+    }
+    .app-title { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.03em; }
+    /* Fila 2: icones + filtres */
+    .top-bar-right {
+        order: 2; gap: 4px; padding: 6px 10px;
+        width: 100%; justify-content: flex-start;
+    }
+    .user-label { display: none; }
+    /* Fila 3: filtres + cerca */
+    .top-bar-center {
+        order: 3; width: 100%; gap: 6px;
+        padding: 0 10px 6px; flex-wrap: nowrap;
+    }
     .search-input { flex: 1; min-width: 0; }
     .search-input.collapsed { width: 0; padding: 0; border: none; flex: 0; }
     .btn-search-toggle { display: inline-flex; }
     .filter-avatars { flex-wrap: nowrap; overflow-x: auto; }
-    .top-bar-right { gap: 4px; }
-    .user-label { display: none; }
 
     /* === NAVEGACIO PER PILES: llista o detall === */
     .panel-projectes { width: 100%; min-width: 100%; border-right: none; }

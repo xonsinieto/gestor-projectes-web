@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gestor-v2';
+const CACHE_NAME = 'gestor-v3';
 const STATIC_ASSETS = [
     '/',
     '/static/css/style.css',

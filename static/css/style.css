@@ -441,8 +441,8 @@ a.btn-document:visited { color: #065F46; }
     .user-label { display: none; }
     .top-bar-center {
         order: 3; gap: 6px;
-        padding: 6px 10px 6px 0; flex-wrap: nowrap;
-        margin-left: auto; flex-shrink: 1; min-width: 0;
+        padding: 6px 10px; flex-wrap: nowrap;
+        margin-left: auto; flex-shrink: 0;
     }
     .search-input { flex: 1; min-width: 0; }
     .search-input.collapsed { width: 0; padding: 0; border: none; flex: 0; }

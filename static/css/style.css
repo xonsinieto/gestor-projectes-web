@@ -425,24 +425,24 @@ a.btn-document:visited { color: #065F46; }
     /* === BARRA SUPERIOR: 2 files per mobil === */
     .top-bar {
         padding: 0; gap: 0; flex-wrap: wrap; min-height: auto;
-        flex-direction: column; align-items: stretch;
+        flex-direction: row; align-items: center;
     }
-    /* Fila 1: titol amb fons gris subtil */
+    /* Fila 1: titol amb fons gris subtil (ocupa tota l'amplada) */
     .top-bar-left {
         width: 100%; padding: 10px 14px;
         background: #F3F4F6; border-bottom: 1px solid #E5E7EB;
     }
     .app-title { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.03em; }
-    /* Fila 2: icones + filtres */
+    /* Fila 2: icones (esquerra) + filtres + lupa (dreta) */
     .top-bar-right {
         order: 2; gap: 4px; padding: 6px 10px;
-        width: 100%; justify-content: flex-start;
+        flex-shrink: 0; justify-content: flex-start;
     }
     .user-label { display: none; }
-    /* Fila 3: filtres + cerca */
     .top-bar-center {
-        order: 3; width: 100%; gap: 6px;
-        padding: 0 10px 6px; flex-wrap: nowrap;
+        order: 3; gap: 6px;
+        padding: 6px 10px 6px 0; flex-wrap: nowrap;
+        margin-left: auto; flex-shrink: 1; min-width: 0;
     }
     .search-input { flex: 1; min-width: 0; }
     .search-input.collapsed { width: 0; padding: 0; border: none; flex: 0; }

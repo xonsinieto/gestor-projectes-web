@@ -417,31 +417,63 @@ a.btn-document:visited { color: #065F46; }
    RESPONSIVE: TABLET VERTICAL (< 768px)
    ================================================================== */
 @media (max-width: 767px) {
-    .app-title { font-size: 0.85rem; }
-    .search-input { width: 120px; }
-    .top-bar { padding: 6px 10px; gap: 6px; }
+    /* === BARRA SUPERIOR: compacta per mobil === */
+    .top-bar { padding: 6px 10px; gap: 4px; flex-wrap: wrap; min-height: auto; }
+    .app-title { font-size: 0.8rem; }
+    .top-bar-center { order: 3; width: 100%; gap: 6px; }
+    .search-input { width: 100px; flex: 1; }
+    .filter-avatars { flex-wrap: nowrap; overflow-x: auto; }
+    .top-bar-right { gap: 4px; }
+    .user-label { display: none; }
 
-    /* Navegacio per piles: llista o detall (no ambdos) */
+    /* === NAVEGACIO PER PILES: llista o detall === */
     .panel-projectes { width: 100%; min-width: 100%; border-right: none; }
     .panel-detall { display: none; width: 100%; }
-
-    /* Quan main-content te classe 'showing-detall', amaga llista i mostra detall */
     .main-content.showing-detall .panel-projectes { display: none; }
     .main-content.showing-detall .panel-detall { display: flex; }
 
     /* Mostrar boto "tornar" */
     .btn-tornar { display: inline-flex; }
 
-    /* Dialog mes ample */
+    /* === DETALL HEADER: multi-linia === */
+    .detall-header { padding: 10px 12px; }
+    .detall-header-top { flex-wrap: wrap; gap: 4px; }
+    .detall-titol { font-size: 0.95rem; width: 100%; order: 2; }
+    .detall-progres { font-size: 0.8rem; order: 3; }
+    .btn-tornar { order: 0; }
+    #btn-afegir-tasca { order: 1; margin-left: auto; }
+
+    /* === OVERVIEW: 2 cols mobil === */
+    .overview-tasques { grid-template-columns: repeat(2, 1fr); gap: 2px 8px; }
+
+    /* === FILA TASCA: tot apilat === */
+    .fila-tasca { padding: 8px; }
+    .fila-tasca-row2 { flex-wrap: wrap; gap: 4px; }
+    .tasca-estats { flex-wrap: wrap; gap: 3px; }
+    .btn-estat { padding: 4px 10px; font-size: 0.7rem; }
+    .tasca-row2-right { width: 100%; margin-left: 0; margin-top: 4px; flex-wrap: wrap; gap: 4px; }
+    .btn-document { max-width: 100%; }
+
+    /* === OBSERVACIONS === */
+    .obs-historial { font-size: 0.75rem; }
+
+    /* === BARRA INFERIOR: apilada === */
+    .bottom-bar { flex-direction: column; padding: 4px 10px; gap: 2px; align-items: flex-start; }
+    .bottom-resum { width: 100%; }
+    .bottom-text { white-space: normal; font-size: 0.7rem; line-height: 1.4; }
+    .bottom-sync { font-size: 0.65rem; }
+
+    /* === DIALOG === */
     .dialog { width: 95vw; }
     .notif-popup { width: calc(100vw - 32px); right: 16px; }
+}
 
-    /* Barra inferior responsive */
-    .bottom-bar { flex-wrap: wrap; gap: 4px; }
-    .bottom-resum { gap: 8px; }
-
-    /* Overview: 2 cols en mòbil/tablet vertical */
-    .overview-tasques { grid-template-columns: repeat(2, 1fr); }
+/* Mobils molt petits (< 400px) */
+@media (max-width: 399px) {
+    .overview-tasques { grid-template-columns: 1fr; }
+    .top-bar-center { gap: 4px; }
+    .filter-avatars .filter-btn { padding: 3px 8px; font-size: 0.7rem; }
+    .filter-avatars .avatar-btn { width: 24px; height: 24px; font-size: 0.55rem; }
 }
 
 /* Tablet horitzontal i desktop */

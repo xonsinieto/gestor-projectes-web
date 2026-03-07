@@ -194,7 +194,7 @@ const App = {
 
     async seleccionarProjecte(nom) {
         this.projecteActual = nom;
-        document.getElementById('panel-detall').classList.add('active');
+        document.querySelector('.main-content').classList.add('showing-detall');
         // Carregar detall i actualitzar llista en paral·lel
         await Promise.all([
             this._carregarDetall(nom),
@@ -1050,7 +1050,7 @@ const App = {
     // --- RESPONSIVE: TORNAR ---
 
     tornarALlista() {
-        document.getElementById('panel-detall').classList.remove('active');
+        document.querySelector('.main-content').classList.remove('showing-detall');
     },
 
     // --- POLLING ---

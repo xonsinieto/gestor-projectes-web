@@ -422,11 +422,12 @@ a.btn-document:visited { color: #065F46; }
     .top-bar { padding: 6px 10px; gap: 6px; }
 
     /* Navegacio per piles: llista o detall (no ambdos) */
-    .panel-projectes { width: 100%; min-width: 100%; }
+    .panel-projectes { width: 100%; min-width: 100%; border-right: none; }
     .panel-detall { display: none; width: 100%; }
-    .panel-detall.active { display: flex; }
-    .panel-detall.active ~ .panel-projectes,
-    .panel-projectes:has(~ .panel-detall.active) { display: none; }
+
+    /* Quan main-content te classe 'showing-detall', amaga llista i mostra detall */
+    .main-content.showing-detall .panel-projectes { display: none; }
+    .main-content.showing-detall .panel-detall { display: flex; }
 
     /* Mostrar boto "tornar" */
     .btn-tornar { display: inline-flex; }
@@ -446,7 +447,6 @@ a.btn-document:visited { color: #065F46; }
 /* Tablet horitzontal i desktop */
 @media (min-width: 768px) {
     .btn-tornar { display: none; }
-    .panel-detall.active { display: flex; }
 }
 
 /* === MENU CONTEXTUAL PROJECTE (⋮) === */

@@ -4,7 +4,7 @@ Punt d'entrada principal.
 """
 from datetime import timedelta
 
-from flask import Flask, send_from_directory
+from flask import Flask, request
 from flask_session import Session
 
 import config_web
@@ -47,17 +47,11 @@ def create_app():
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(views_bp)
 
-    @app.route('/static/sw.js')
-    def service_worker():
-        resp = send_from_directory(app.static_folder, 'sw.js')
-        resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        resp.headers['Pragma'] = 'no-cache'
-        resp.headers['Expires'] = '0'
-        return resp
-
     @app.after_request
     def add_cache_headers(resp):
-        if resp.content_type and ('javascript' in resp.content_type or 'css' in resp.content_type):
+        if request.path.endswith('/sw.js'):
+            resp.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        elif resp.content_type and ('javascript' in resp.content_type or 'css' in resp.content_type):
             resp.headers['Cache-Control'] = 'no-cache, max-age=0'
         return resp
 

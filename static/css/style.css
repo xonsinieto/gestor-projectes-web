@@ -36,6 +36,11 @@ body {
     font-size: 0.9rem; outline: none; width: 180px; max-width: 100%;
 }
 .search-input:focus { border-color: #3B82F6; }
+.btn-search-toggle {
+    display: none; width: 32px; height: 32px; border: none; background: transparent;
+    border-radius: 8px; cursor: pointer; align-items: center; justify-content: center;
+    color: #6B7280; flex-shrink: 0;
+}
 
 /* === FILTER AVATARS === */
 .filter-avatars { display: flex; gap: 4px; align-items: center; }
@@ -421,7 +426,9 @@ a.btn-document:visited { color: #065F46; }
     .top-bar { padding: 6px 10px; gap: 4px; flex-wrap: wrap; min-height: auto; }
     .app-title { font-size: 0.8rem; }
     .top-bar-center { order: 3; width: 100%; gap: 6px; }
-    .search-input { width: 100px; flex: 1; }
+    .search-input { flex: 1; min-width: 0; }
+    .search-input.collapsed { width: 0; padding: 0; border: none; flex: 0; }
+    .btn-search-toggle { display: inline-flex; }
     .filter-avatars { flex-wrap: nowrap; overflow-x: auto; }
     .top-bar-right { gap: 4px; }
     .user-label { display: none; }
@@ -438,10 +445,13 @@ a.btn-document:visited { color: #065F46; }
     /* === DETALL HEADER: multi-linia === */
     .detall-header { padding: 10px 12px; }
     .detall-header-top { flex-wrap: wrap; gap: 4px; }
-    .detall-titol { font-size: 0.95rem; width: 100%; order: 2; }
-    .detall-progres { font-size: 0.8rem; order: 3; }
+    .detall-titol { font-size: 0.95rem; width: 100%; order: 2; white-space: normal; }
+    .detall-progres { font-size: 0.78rem; order: 3; width: 100%; }
     .btn-tornar { order: 0; }
     #btn-afegir-tasca { order: 1; margin-left: auto; }
+
+    /* === AMAGAR CERCADOR en vista detall === */
+    .main-content.showing-detall .top-bar-center { display: none; }
 
     /* === OVERVIEW: 2 cols mobil === */
     .overview-tasques { grid-template-columns: repeat(2, 1fr); gap: 2px 8px; }

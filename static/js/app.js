@@ -20,6 +20,10 @@ const App = {
 
     async init() {
         this._bindEvents();
+        // En mobil, col·lapsar cercador per defecte
+        if (window.innerWidth < 768) {
+            document.getElementById('cerca').classList.add('collapsed');
+        }
         await this.carregarProjectes();
         this._iniciarPolling();
         this._carregarNotificacions();
@@ -1051,6 +1055,18 @@ const App = {
 
     tornarALlista() {
         document.querySelector('.main-content').classList.remove('showing-detall');
+    },
+
+    toggleCerca() {
+        const input = document.getElementById('cerca');
+        input.classList.toggle('collapsed');
+        if (!input.classList.contains('collapsed')) {
+            input.focus();
+        } else {
+            input.value = '';
+            this.cercaText = '';
+            this.carregarProjectes();
+        }
     },
 
     // --- POLLING ---

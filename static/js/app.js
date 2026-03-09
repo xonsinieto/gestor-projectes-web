@@ -971,6 +971,7 @@ const App = {
             }
         });
         container.innerHTML = html;
+        container.classList.toggle('has-filter', !!this.filtrePersona);
     },
 
     async filtrar(persona) {

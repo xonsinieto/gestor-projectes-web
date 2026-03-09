@@ -50,6 +50,7 @@ body {
 }
 .filter-btn.active { background: #3B82F6; color: white; border-color: #3B82F6; }
 .filter-avatar.active { box-shadow: 0 0 0 2px #1F2937; }
+.filter-avatars.has-filter .filter-avatar:not(.active) { opacity: 0.4; filter: grayscale(100%); }
 
 /* === MAIN CONTENT === */
 .main-content { display: flex; flex: 1; overflow: hidden; }

@@ -488,20 +488,9 @@ const App = {
         }
     },
 
-    async obrirCarpeta(nomProjecte) {
-        try {
-            const encodedPath = nomProjecte.split('/').map(s => encodeURIComponent(s)).join('/');
-            const resp = await fetch(`/api/obrir-carpeta/${encodedPath}`);
-            const data = await resp.json();
-            if (data.url) {
-                window.open(data.url, '_blank');
-            } else {
-                alert(data.error || 'No s\'ha pogut obrir la carpeta.');
-            }
-        } catch (e) {
-            console.error('Error obrint carpeta:', e);
-            alert('Error de connexio obrint la carpeta.');
-        }
+    obrirCarpeta(nomProjecte) {
+        const encodedPath = nomProjecte.split('/').map(s => encodeURIComponent(s)).join('/');
+        window.open(`/api/redir-document/${encodedPath}`, '_blank');
     },
 
     _renderObservacions(t, nomProjecte) {

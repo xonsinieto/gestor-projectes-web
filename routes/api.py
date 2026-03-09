@@ -473,10 +473,54 @@ def redir_document(ruta):
     if not info:
         return f"No s'ha trobat el document: {ruta}", 404
 
-    # Carpetes: redirect directe a webUrl (funciona be)
+    # Carpetes: pàgina intermèdia amb intent per obrir a l'app
     if info["is_folder"]:
-        logger.info(f"Carpeta - redirect directe: {info['webUrl']}")
-        return redirect(info["webUrl"])
+        folder_url = info['webUrl']
+        folder_name = info.get("name", ruta.rsplit("/", 1)[-1])
+        logger.info(f"Carpeta - pagina intermedia: {folder_url}")
+        return f"""<!DOCTYPE html>
+<html><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Obrint carpeta...</title>
+<style>
+body {{ font-family: 'Segoe UI', sans-serif; text-align: center; padding: 30px 16px;
+       background: #F9FAFB; color: #374151; }}
+.filename {{ background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 8px;
+            padding: 10px 16px; margin: 16px auto; max-width: 320px;
+            font-size: 14px; color: #065F46; word-break: break-all; }}
+.btn {{ display: block; width: 280px; margin: 10px auto; padding: 14px 20px;
+       border-radius: 10px; text-decoration: none; font-size: 15px;
+       font-weight: 600; text-align: center; cursor: pointer; border: none; }}
+.btn-primary {{ background: #10B981; color: white; }}
+.btn-web {{ background: #E5E7EB; color: #374151; font-weight: 400; font-size: 13px; }}
+.divider {{ color: #9CA3AF; font-size: 12px; margin: 16px 0 8px; }}
+.msg {{ font-size: 12px; color: #9CA3AF; margin: 8px auto; max-width: 280px; display: none; }}
+</style>
+</head><body>
+<p style="font-size:15px; margin-bottom:4px;">\U0001f4c2 Carpeta:</p>
+<div class="filename"><strong>{folder_name}</strong></div>
+<button class="btn btn-primary" onclick="obrirApp('{folder_url}')">
+Obrir a l'app OneDrive</button>
+<p id="msg-app" class="msg">Si no s'ha obert l'app, prova l'opcio de sota.</p>
+<p class="divider">o be:</p>
+<a class="btn btn-web" href="{folder_url}" target="_blank">Obrir al navegador web</a>
+<script>
+function obrirApp(url) {{
+    var isAndroid = /android/i.test(navigator.userAgent);
+    if (isAndroid) {{
+        var parsed = new URL(url);
+        var intentUrl = 'intent://' + parsed.host + parsed.pathname + parsed.search + parsed.hash +
+            '#Intent;scheme=https;package=com.microsoft.skydrive;end';
+        document.getElementById('msg-app').style.display = 'block';
+        window.location = intentUrl;
+        return;
+    }}
+    document.getElementById('msg-app').style.display = 'block';
+    window.location = url;
+}}
+</script>
+</body></html>"""
 
     # Fitxers: pagina intermedia amb opcions
     item_id = info.get("id", "")
@@ -498,13 +542,23 @@ def redir_document(ruta):
 
     logger.info(f"Fitxer - redir: {redir_url}, carpeta: {parent_folder_url}")
 
+    # URL de descàrrega directa (funciona sempre)
+    download_url = info.get("downloadUrl", "")
+
     # Bloc HTML per la carpeta pare (si existeix)
-    folder_html = ""
+    folder_btn = ""
     if parent_folder_url:
-        folder_html = (
-            '<p class="divider">Si no s\'obre a l\'app:</p>'
-            f'<a class="btn btn-folder" href="{parent_folder_url}">'
-            '\U0001f4c2 Obrir carpeta a OneDrive</a>'
+        folder_btn = (
+            f'<button class="btn btn-folder" onclick="obrirApp(\'{parent_folder_url}\')">'
+            '\U0001f4c2 Obrir carpeta a l\'app OneDrive</button>'
+        )
+
+    # Bloc descàrrega directa
+    download_btn = ""
+    if download_url:
+        download_btn = (
+            f'<a class="btn btn-download" href="{download_url}" download="{filename}">'
+            '\U0001f4e5 Descarregar fitxer</a>'
         )
 
     return f"""<!DOCTYPE html>
@@ -520,19 +574,45 @@ body {{ font-family: 'Segoe UI', sans-serif; text-align: center; padding: 30px 1
             font-size: 14px; color: #1E40AF; word-break: break-all; }}
 .btn {{ display: block; width: 280px; margin: 10px auto; padding: 14px 20px;
        border-radius: 10px; text-decoration: none; font-size: 15px;
-       font-weight: 600; text-align: center; }}
+       font-weight: 600; text-align: center; cursor: pointer; border: none; }}
 .btn-primary {{ background: #0078D4; color: white; }}
 .btn-folder {{ background: #10B981; color: white; }}
+.btn-download {{ background: #8B5CF6; color: white; }}
 .btn-web {{ background: #E5E7EB; color: #374151; font-weight: 400; font-size: 13px; }}
 .divider {{ color: #9CA3AF; font-size: 12px; margin: 16px 0 8px; }}
+.msg {{ font-size: 12px; color: #9CA3AF; margin: 8px auto; max-width: 280px; display: none; }}
 </style>
 </head><body>
 <p style="font-size:15px; margin-bottom:4px;">\U0001f4c4 Document:</p>
 <div class="filename"><strong>{filename}</strong></div>
-<a class="btn btn-primary" href="{redir_url}">Obrir document</a>
-{folder_html}
+
+<button class="btn btn-primary" onclick="obrirApp('{redir_url}')">
+Obrir a l'app OneDrive</button>
+<p id="msg-app" class="msg">Si no s'ha obert l'app, prova les opcions de sota.</p>
+
+{folder_btn}
+{download_btn}
+
 <p class="divider">o be:</p>
-<a class="btn btn-web" href="{web_url or redir_url}" target="_blank">Obrir al navegador</a>
+<a class="btn btn-web" href="{web_url or redir_url}" target="_blank">Obrir al navegador web</a>
+
+<script>
+function obrirApp(url) {{
+    // Android: intent URL per forcar obertura a l'app OneDrive
+    var isAndroid = /android/i.test(navigator.userAgent);
+    if (isAndroid) {{
+        var parsed = new URL(url);
+        var intentUrl = 'intent://' + parsed.host + parsed.pathname + parsed.search + parsed.hash +
+            '#Intent;scheme=https;package=com.microsoft.skydrive;end';
+        document.getElementById('msg-app').style.display = 'block';
+        window.location = intentUrl;
+        return;
+    }}
+    // iOS o altres: obrir URL directament (iOS sol preguntar si obrir a l'app)
+    document.getElementById('msg-app').style.display = 'block';
+    window.location = url;
+}}
+</script>
 </body></html>"""
 
 

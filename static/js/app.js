@@ -311,7 +311,7 @@ const App = {
         const obsHTML = this._renderObservacions(t, nomProjecte);
 
         return `
-            <div class="fila-tasca${classPropi}">
+            <div class="fila-tasca${classPropi}" data-tasca="${this._esc(t.nom)}">
                 <div class="fila-tasca-row1">
                     <span class="tasca-nom">${this._esc(t.nom)}</span>
                     <div class="tasca-avatars">${assignatHTML}</div>
@@ -1017,15 +1017,38 @@ const App = {
             </div>`;
             notifs.forEach(n => {
                 const accioText = CONFIG.etiquetes[n.accio] || n.accio;
-                html += `<div class="notif-item">
+                html += `<div class="notif-item" onclick="App._anarANotificacio('${n.id}','${this._esc(n.projecte)}','${this._esc(n.tasca)}',this)">
                     <div class="notif-text"><strong>${this._esc(n.de)}</strong> ha marcat <em>${this._esc(n.tasca)}</em> com a ${accioText}</div>
                     <div class="notif-meta">${this._esc(n.projecte)}</div>
-                    <button class="btn-icon" onclick="App._marcarLlegida('${n.id}',this.closest('.notif-item'))">&#10003;</button>
+                    <button class="btn-icon" onclick="event.stopPropagation();App._marcarLlegida('${n.id}',this.closest('.notif-item'))">&#10003;</button>
                 </div>`;
             });
             popup.innerHTML = html;
         }
         popup.classList.remove('hidden');
+    },
+
+    async _anarANotificacio(id, projecte, tasca, element) {
+        // 1. Marcar com a llegida
+        await API.post(`/api/notificacions/${id}/llegida`);
+        if (element) element.remove();
+        this._carregarNotificacions();
+
+        // 2. Tancar popup notificacions
+        document.getElementById('notif-popup').classList.add('hidden');
+
+        // 3. Navegar al projecte
+        await this.seleccionarProjecte(projecte);
+
+        // 4. Buscar la tasca i fer scroll + destacar
+        setTimeout(() => {
+            const fila = document.querySelector(`.fila-tasca[data-tasca="${CSS.escape(tasca)}"]`);
+            if (fila) {
+                fila.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                fila.classList.add('fila-tasca-highlight');
+                setTimeout(() => fila.classList.remove('fila-tasca-highlight'), 3000);
+            }
+        }, 200);
     },
 
     async _marcarLlegida(id, element) {

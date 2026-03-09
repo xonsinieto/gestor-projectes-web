@@ -323,10 +323,20 @@ a.btn-document:visited { color: #065F46; }
     box-shadow: 0 4px 24px rgba(0,0,0,0.12); overflow-y: auto; z-index: 100;
 }
 .notif-header { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #E5E7EB; }
-.notif-item { display: flex; align-items: start; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #F3F4F6; }
+.notif-item { display: flex; align-items: start; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #F3F4F6; cursor: pointer; transition: background 0.15s; }
+.notif-item:hover { background: #FEF9C3; }
 .notif-text { flex: 1; font-size: 0.85rem; }
 .notif-meta { font-size: 0.75rem; color: #9CA3AF; }
 .notif-empty { padding: 24px; text-align: center; color: #9CA3AF; }
+
+/* Highlight animat quan es navega a una tasca */
+.fila-tasca-highlight {
+    animation: highlight-pulse 3s ease-out;
+}
+@keyframes highlight-pulse {
+    0%, 15% { background: #FEF08A; box-shadow: 0 0 0 3px #FACC15; }
+    100% { background: transparent; box-shadow: none; }
+}
 
 /* === BARRA INFERIOR (RESUM) === */
 .bottom-bar {

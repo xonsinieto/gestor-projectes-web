@@ -47,12 +47,17 @@ class DataManagerWeb:
 
         self._dades_raw = dades
 
-        self._projectes = {}
+        projectes_nous = {}
         for nom_carpeta, dades_projecte in dades.get("projectes", {}).items():
-            self._projectes[nom_carpeta] = Projecte.from_dict(
+            projectes_nous[nom_carpeta] = Projecte.from_dict(
                 nom_carpeta, dades_projecte
             )
 
+        # Protecció: si el JSON ve buit però teníem projectes, no esborrar
+        if not projectes_nous and self._projectes:
+            return self._projectes
+
+        self._projectes = projectes_nous
         self._usuaris = dades.get("usuaris", [])
 
         self._notificacions = [
@@ -63,7 +68,15 @@ class DataManagerWeb:
 
     def desar(self, projectes: dict[str, Projecte]):
         """Desa projectes + notificacions acumulades en UNA sola escriptura."""
+        # Protecció: no sobreescriure amb 0 projectes si en teníem
+        if not projectes and self._projectes:
+            return
+
         dades = dict(self._dades_raw)
+
+        # Protecció: si no teníem dades raw (error de lectura), no escriure
+        if not dades and self._projectes:
+            return
         dades["usuaris"] = self._usuaris
         dades["ultima_modificacio"] = datetime.now().isoformat(timespec="seconds")
         dades["projectes"] = {nom: p.to_dict() for nom, p in projectes.items()}
